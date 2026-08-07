@@ -159,6 +159,21 @@
   .gear-item .note-box.show { display: block; }
   .gear-item.important label { color: var(--danger); }
 
+  .smiley-box {
+    display: none;
+    text-align: center;
+    font-size: 64px;
+    line-height: 1;
+    margin-top: 10px;
+    animation: pop 0.35s ease;
+  }
+  .smiley-box.show { display: block; }
+  @keyframes pop {
+    0% { transform: scale(0.4); opacity: 0; }
+    60% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+
   .btn-primary {
     width: 100%;
     padding: 16px;
@@ -424,17 +439,17 @@ const DAILY_CHECKLIST = [
   { id: 'photosTaken', label: 'Were all required photos taken today?', options: ['Yes','No','N/A'], noteWhen: [], noteRequired: false },
   { id: 'photosUploaded', label: 'Were all required progress photos uploaded to Tradify?', options: ['Yes','No','N/A'], noteWhen: [], noteRequired: false },
   { id: 'timesheetsComplete', label: 'Are your Tradify timesheets complete and accurate?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: 'What needs fixing?', noteRequired: false },
-  { id: 'clientHappy', label: "Is the client happy with today's progress?", options: ['Yes','No','N/A'], noteWhen: ['No','N/A'], notePrompt: "What's the issue?", noteRequired: true },
+  { id: 'clientHappy', label: "Is the client happy with today's progress?", options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: "What's the issue?", noteRequired: true },
   { id: 'officeAction', label: 'Is there anything the office needs to action before tomorrow?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'What do they need to do?', noteRequired: true },
   { id: 'materialsToOrder', label: 'Are there any materials that need to be ordered?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: "What's needed?", noteRequired: true },
   { id: 'readyTomorrow', label: "Do you have everything required for tomorrow's work?", options: ['Yes','No'], noteWhen: ['No'], notePrompt: "What's missing?", noteRequired: true },
   { id: 'safetyIncident', label: 'Were there any safety incidents, hazards or near misses today?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'Please describe what happened', noteRequired: true, important: true },
   { id: 'qualityIssue', label: 'Were any defects, damage or quality issues identified today?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'Please describe', noteRequired: true },
-  { id: 'siteClean', label: 'Has the job site been left clean and tidy?', options: ['Yes','No','N/A'], noteWhen: ['No','N/A'], notePrompt: 'Why not?', noteRequired: true },
-  { id: 'toolsPacked', label: 'Tools packed', options: ['Yes','No','N/A'], noteWhen: ['No','N/A'], notePrompt: 'Why not?', noteRequired: true },
-  { id: 'plantSecured', label: 'Plant / equipment secured', options: ['Yes','No','N/A'], noteWhen: ['No','N/A'], notePrompt: 'Why not?', noteRequired: true },
-  { id: 'wasteSorted', label: 'Has all rubbish been removed or properly stored?', options: ['Yes','No','N/A'], noteWhen: ['No','N/A'], notePrompt: 'Why not?', noteRequired: true },
-  { id: 'goodDay', label: 'Did you have a good day?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: 'What happened?', noteRequired: true }
+  { id: 'siteClean', label: 'Has the job site been left clean and tidy?', options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: 'Why not?', noteRequired: true },
+  { id: 'toolsPacked', label: 'Tools packed', options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: 'Why not?', noteRequired: true },
+  { id: 'plantSecured', label: 'Plant / equipment secured', options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: 'Why not?', noteRequired: true },
+  { id: 'wasteSorted', label: 'Has all rubbish been removed or properly stored?', options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: 'Why not?', noteRequired: true },
+  { id: 'goodDay', label: 'Did you have a good day?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: 'What happened?', noteRequired: true, celebrateWhen: ['Yes'], celebrateEmoji: '😄' }
 ];
 
 /* ============================================================
@@ -507,6 +522,7 @@ function buildDailyChecklist() {
         <label>${q.label}</label>
         <div class="yesno" data-field="${q.id}">${buttons}</div>
         <div class="note-box"><textarea placeholder="${q.notePrompt || ''}${q.noteRequired ? ' (required)' : ' (optional)'}" id="note-${q.id}"></textarea></div>
+        ${q.celebrateEmoji ? `<div class="smiley-box" id="smiley-${q.id}">${q.celebrateEmoji}</div>` : ''}
       </div>`;
   }).join('');
 }
@@ -561,6 +577,11 @@ function setDaily(id, value) {
   const q = DAILY_CHECKLIST.find(q => q.id === id);
   const noteBox = document.getElementById('daily-' + id).querySelector('.note-box');
   noteBox.classList.toggle('show', q.noteWhen.includes(value));
+
+  if (q.celebrateEmoji) {
+    const smiley = document.getElementById('smiley-' + id);
+    smiley.classList.toggle('show', q.celebrateWhen.includes(value));
+  }
 }
 
 /* ============================================================
@@ -672,6 +693,7 @@ function resetForm() {
   document.getElementById('variationHours').value = '';
   document.querySelectorAll('.yesno button').forEach(b => b.classList.remove('selected'));
   document.querySelectorAll('.note-box').forEach(n => { n.classList.remove('show'); n.querySelector('textarea').value = ''; });
+  document.querySelectorAll('.smiley-box').forEach(s => s.classList.remove('show'));
   document.getElementById('otherNotes').value = '';
   document.getElementById('apprenticeReflection').value = '';
   document.getElementById('apprenticeCard').classList.add('hidden');
