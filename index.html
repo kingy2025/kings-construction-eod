@@ -252,24 +252,6 @@
       <select id="jobSelect"><option value="">Loading jobs…</option></select>
     </div>
 
-    <div class="card">
-      <h2>Today's work</h2>
-      <label>Tasks done</label>
-      <div class="task-list" id="taskList">
-        <label class="check"><input type="checkbox" value="Demolition/strip-out"> Demolition / strip-out</label>
-        <label class="check"><input type="checkbox" value="Carpentry/framing"> Carpentry / framing</label>
-        <label class="check"><input type="checkbox" value="Plastering"> Plastering</label>
-        <label class="check"><input type="checkbox" value="Painting"> Painting</label>
-        <label class="check"><input type="checkbox" value="Tiling/waterproofing"> Tiling / waterproofing</label>
-        <label class="check"><input type="checkbox" value="Fix-out/joinery"> Fix-out / joinery</label>
-        <label class="check"><input type="checkbox" value="Site clean/waste"> Site clean / waste removal</label>
-        <label class="check"><input type="checkbox" value="Inspection/reporting"> Inspection / reporting</label>
-      </div>
-
-      <label>Stage of works</label>
-      <select id="stageSelect"></select>
-    </div>
-
     <div class="card highlight-box">
       <label>Job update <span class="required-star">*</span> — where's the job at, what's left, any blockers?</label>
       <textarea id="jobUpdate" placeholder="e.g. Demo complete in bathroom, plaster booked for Thursday, waiting on tile delivery..."></textarea>
@@ -312,46 +294,6 @@
         <div class="flag-detail hidden" id="detailMaterials">
           <textarea id="detailMaterialsText" placeholder="What's needed?"></textarea>
         </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Site clean + gear</h2>
-      <div class="gear-item" id="gear-siteClean">
-        <label>Has the job site been left clean and tidy?</label>
-        <div class="yesno" data-field="siteClean">
-          <button class="sel-yes" onclick="setYesNo('siteClean','Yes')">Yes</button>
-          <button class="sel-no" onclick="setYesNo('siteClean','No')">No</button>
-          <button class="sel-na" onclick="setYesNo('siteClean','N/A')">N/A</button>
-        </div>
-        <div class="note-box"><textarea placeholder="Why not? (required)" id="note-siteClean"></textarea></div>
-      </div>
-      <div class="gear-item" id="gear-toolsPacked">
-        <label>Tools packed</label>
-        <div class="yesno" data-field="toolsPacked">
-          <button class="sel-yes" onclick="setYesNo('toolsPacked','Yes')">Yes</button>
-          <button class="sel-no" onclick="setYesNo('toolsPacked','No')">No</button>
-          <button class="sel-na" onclick="setYesNo('toolsPacked','N/A')">N/A</button>
-        </div>
-        <div class="note-box"><textarea placeholder="Why not? (required)" id="note-toolsPacked"></textarea></div>
-      </div>
-      <div class="gear-item" id="gear-plantSecured">
-        <label>Plant / equipment secured</label>
-        <div class="yesno" data-field="plantSecured">
-          <button class="sel-yes" onclick="setYesNo('plantSecured','Yes')">Yes</button>
-          <button class="sel-no" onclick="setYesNo('plantSecured','No')">No</button>
-          <button class="sel-na" onclick="setYesNo('plantSecured','N/A')">N/A</button>
-        </div>
-        <div class="note-box"><textarea placeholder="Why not? (required)" id="note-plantSecured"></textarea></div>
-      </div>
-      <div class="gear-item" id="gear-wasteSorted">
-        <label>Has all rubbish been removed or properly stored?</label>
-        <div class="yesno" data-field="wasteSorted">
-          <button class="sel-yes" onclick="setYesNo('wasteSorted','Yes')">Yes</button>
-          <button class="sel-no" onclick="setYesNo('wasteSorted','No')">No</button>
-          <button class="sel-na" onclick="setYesNo('wasteSorted','N/A')">N/A</button>
-        </div>
-        <div class="note-box"><textarea placeholder="Why not? (required)" id="note-wasteSorted"></textarea></div>
       </div>
     </div>
 
@@ -488,7 +430,11 @@ const DAILY_CHECKLIST = [
   { id: 'readyTomorrow', label: "Do you have everything required for tomorrow's work?", options: ['Yes','No'], noteWhen: ['No'], notePrompt: "What's missing?", noteRequired: true },
   { id: 'safetyIncident', label: 'Were there any safety incidents, hazards or near misses today?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'Please describe what happened', noteRequired: true, important: true },
   { id: 'qualityIssue', label: 'Were any defects, damage or quality issues identified today?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'Please describe', noteRequired: true },
-  { id: 'goodDay', label: 'Did you have a good day?', options: ['Yes','No'], noteWhen: [], noteRequired: false }
+  { id: 'siteClean', label: 'Has the job site been left clean and tidy?', options: ['Yes','No','N/A'], noteWhen: ['No','N/A'], notePrompt: 'Why not?', noteRequired: true },
+  { id: 'toolsPacked', label: 'Tools packed', options: ['Yes','No','N/A'], noteWhen: ['No','N/A'], notePrompt: 'Why not?', noteRequired: true },
+  { id: 'plantSecured', label: 'Plant / equipment secured', options: ['Yes','No','N/A'], noteWhen: ['No','N/A'], notePrompt: 'Why not?', noteRequired: true },
+  { id: 'wasteSorted', label: 'Has all rubbish been removed or properly stored?', options: ['Yes','No','N/A'], noteWhen: ['No','N/A'], notePrompt: 'Why not?', noteRequired: true },
+  { id: 'goodDay', label: 'Did you have a good day?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: 'What happened?', noteRequired: true }
 ];
 
 /* ============================================================
@@ -496,8 +442,6 @@ const DAILY_CHECKLIST = [
    ============================================================ */
 let selectedName = null;
 let selectedRole = null;
-let selectedTasks = new Set();
-let yesNoState = { siteClean: null, toolsPacked: null, plantSecured: null, wasteSorted: null };
 let dailyState = {};
 DAILY_CHECKLIST.forEach(q => dailyState[q.id] = null);
 let pinBuffer = "";
@@ -544,7 +488,7 @@ function selectName(name, role, btnEl) {
 }
 
 function buildStageSelects() {
-  ['stageSelect', 'signoffStage'].forEach(id => {
+  ['signoffStage'].forEach(id => {
     const sel = document.getElementById(id);
     sel.innerHTML = '<option value="">Select stage…</option>' +
       STAGES.map(s => `<option value="${s}">${s}</option>`).join('');
@@ -594,16 +538,6 @@ function showTab(tab) {
 }
 
 /* ============================================================
-   TASK CHECKLIST
-   ============================================================ */
-document.addEventListener('change', (e) => {
-  if (e.target.closest('#taskList')) {
-    const val = e.target.value;
-    if (e.target.checked) selectedTasks.add(val); else selectedTasks.delete(val);
-  }
-});
-
-/* ============================================================
    FLAGS
    ============================================================ */
 function toggleFlag(name) {
@@ -612,21 +546,6 @@ function toggleFlag(name) {
   const item = document.getElementById('flag' + name);
   detail.classList.toggle('hidden', !chk.checked);
   item.classList.toggle('active', chk.checked);
-}
-
-/* ============================================================
-   YES/NO/NA — site clean + gear
-   ============================================================ */
-function setYesNo(field, value) {
-  yesNoState[field] = value;
-  const container = document.querySelector(`.yesno[data-field="${field}"]`);
-  container.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
-  if (value === 'Yes') container.querySelector('.sel-yes').classList.add('selected');
-  if (value === 'No') container.querySelector('.sel-no').classList.add('selected');
-  if (value === 'N/A') container.querySelector('.sel-na').classList.add('selected');
-
-  const noteBox = document.getElementById('gear-' + field).querySelector('.note-box');
-  noteBox.classList.toggle('show', value === 'No' || value === 'N/A');
 }
 
 /* ============================================================
@@ -661,13 +580,6 @@ async function submitEod() {
     }
   }
 
-  for (const field of ['siteClean', 'toolsPacked', 'plantSecured', 'wasteSorted']) {
-    if (!yesNoState[field]) return alert('Please answer all site clean + gear questions.');
-    if ((yesNoState[field] === 'No' || yesNoState[field] === 'N/A') && !document.getElementById('note-' + field).value.trim()) {
-      return alert('Please explain why for: ' + field);
-    }
-  }
-
   const dailyPayload = {};
   DAILY_CHECKLIST.forEach(q => {
     dailyPayload[q.id] = dailyState[q.id];
@@ -680,8 +592,6 @@ async function submitEod() {
     name: selectedName,
     role: selectedRole,
     job: job,
-    tasksDone: Array.from(selectedTasks),
-    stageOfWorks: document.getElementById('stageSelect').value,
     jobUpdate: jobUpdate,
     flagDamage: document.getElementById('chkDamage').checked,
     flagDamageDetail: document.getElementById('detailDamageText').value.trim(),
@@ -692,14 +602,14 @@ async function submitEod() {
     flagHoldUpDetail: document.getElementById('detailHoldUpText').value.trim(),
     flagMaterials: document.getElementById('chkMaterials').checked,
     flagMaterialsDetail: document.getElementById('detailMaterialsText').value.trim(),
-    siteClean: yesNoState.siteClean,
-    siteCleanNote: document.getElementById('note-siteClean').value.trim(),
-    toolsPacked: yesNoState.toolsPacked,
-    toolsPackedNote: document.getElementById('note-toolsPacked').value.trim(),
-    plantSecured: yesNoState.plantSecured,
-    plantSecuredNote: document.getElementById('note-plantSecured').value.trim(),
-    wasteSorted: yesNoState.wasteSorted,
-    wasteSortedNote: document.getElementById('note-wasteSorted').value.trim(),
+    siteClean: dailyPayload.siteClean,
+    siteCleanNote: dailyPayload.siteCleanNote,
+    toolsPacked: dailyPayload.toolsPacked,
+    toolsPackedNote: dailyPayload.toolsPackedNote,
+    plantSecured: dailyPayload.plantSecured,
+    plantSecuredNote: dailyPayload.plantSecuredNote,
+    wasteSorted: dailyPayload.wasteSorted,
+    wasteSortedNote: dailyPayload.wasteSortedNote,
     otherNotes: document.getElementById('otherNotes').value.trim(),
     apprenticeReflection: selectedRole === 'Apprentice' ? document.getElementById('apprenticeReflection').value.trim() : '',
 
@@ -723,7 +633,8 @@ async function submitEod() {
     safetyIncidentDetail: dailyPayload.safetyIncidentNote,
     qualityIssue: dailyPayload.qualityIssue,
     qualityIssueDetail: dailyPayload.qualityIssueNote,
-    goodDay: dailyPayload.goodDay
+    goodDay: dailyPayload.goodDay,
+    goodDayDetail: dailyPayload.goodDayNote
   };
 
   const btn = document.getElementById('submitBtn');
@@ -747,13 +658,10 @@ async function submitEod() {
 }
 
 function resetForm() {
-  selectedName = null; selectedRole = null; selectedTasks = new Set();
-  yesNoState = { siteClean: null, toolsPacked: null, plantSecured: null, wasteSorted: null };
+  selectedName = null; selectedRole = null;
   DAILY_CHECKLIST.forEach(q => dailyState[q.id] = null);
   document.querySelectorAll('#nameGrid .pill').forEach(b => b.classList.remove('selected'));
   document.getElementById('jobSelect').value = '';
-  document.querySelectorAll('#taskList input').forEach(c => c.checked = false);
-  document.getElementById('stageSelect').value = '';
   document.getElementById('jobUpdate').value = '';
   ['Damage','Variation','HoldUp','Materials'].forEach(f => {
     document.getElementById('chk' + f).checked = false;
