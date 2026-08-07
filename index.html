@@ -72,6 +72,11 @@
     margin: 0 0 12px 0;
     color: var(--brand);
   }
+  .card .card-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin: -8px 0 12px 0;
+  }
   label { display: block; font-size: 14px; font-weight: 600; margin: 12px 0 6px; }
   label:first-child { margin-top: 0; }
 
@@ -149,8 +154,10 @@
   .yesno button.sel-na.selected { background: var(--muted); border-color: var(--muted); color: #fff; }
 
   .gear-item { margin-bottom: 16px; }
+  .gear-item:last-child { margin-bottom: 0; }
   .gear-item .note-box { margin-top: 8px; display: none; }
   .gear-item .note-box.show { display: block; }
+  .gear-item.important label { color: var(--danger); }
 
   .btn-primary {
     width: 100%;
@@ -269,6 +276,12 @@
     </div>
 
     <div class="card">
+      <h2>Daily checklist</h2>
+      <div class="card-sub">Tradify / office questions — answer all of these</div>
+      <div id="dailyChecklist"></div>
+    </div>
+
+    <div class="card">
       <h2>Flag to the boss</h2>
 
       <div class="flag-item" id="flagDamage">
@@ -305,7 +318,7 @@
     <div class="card">
       <h2>Site clean + gear</h2>
       <div class="gear-item" id="gear-siteClean">
-        <label>Site left clean & safe</label>
+        <label>Has the job site been left clean and tidy?</label>
         <div class="yesno" data-field="siteClean">
           <button class="sel-yes" onclick="setYesNo('siteClean','Yes')">Yes</button>
           <button class="sel-no" onclick="setYesNo('siteClean','No')">No</button>
@@ -332,7 +345,7 @@
         <div class="note-box"><textarea placeholder="Why not? (required)" id="note-plantSecured"></textarea></div>
       </div>
       <div class="gear-item" id="gear-wasteSorted">
-        <label>Waste sorted</label>
+        <label>Has all rubbish been removed or properly stored?</label>
         <div class="yesno" data-field="wasteSorted">
           <button class="sel-yes" onclick="setYesNo('wasteSorted','Yes')">Yes</button>
           <button class="sel-no" onclick="setYesNo('wasteSorted','No')">No</button>
@@ -458,6 +471,26 @@ const STAGES = [
   "Defects / make-good"
 ];
 
+// Daily checklist questions (Tradify / office questions).
+// Add, remove, or reorder items here — the form and email both
+// pick this up automatically. "options" is ['Yes','No'] or
+// ['Yes','No','N/A']. "noteWhen" lists which answer(s) should pop
+// open a required (or optional) note box.
+const DAILY_CHECKLIST = [
+  { id: 'tasksCompleted', label: 'Were all scheduled Tradify tasks completed today?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: "What's still outstanding?", noteRequired: true },
+  { id: 'scheduleImpact', label: 'Is there anything that will affect the current schedule or timeline?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'What, and how?', noteRequired: true },
+  { id: 'photosTaken', label: 'Were all required photos taken today?', options: ['Yes','No','N/A'], noteWhen: [], noteRequired: false },
+  { id: 'photosUploaded', label: 'Were all required progress photos uploaded to Tradify?', options: ['Yes','No','N/A'], noteWhen: [], noteRequired: false },
+  { id: 'timesheetsComplete', label: 'Are your Tradify timesheets complete and accurate?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: 'What needs fixing?', noteRequired: false },
+  { id: 'clientHappy', label: "Is the client happy with today's progress?", options: ['Yes','No','N/A'], noteWhen: ['No','N/A'], notePrompt: "What's the issue?", noteRequired: true },
+  { id: 'officeAction', label: 'Is there anything the office needs to action before tomorrow?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'What do they need to do?', noteRequired: true },
+  { id: 'materialsToOrder', label: 'Are there any materials that need to be ordered?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: "What's needed?", noteRequired: true },
+  { id: 'readyTomorrow', label: "Do you have everything required for tomorrow's work?", options: ['Yes','No'], noteWhen: ['No'], notePrompt: "What's missing?", noteRequired: true },
+  { id: 'safetyIncident', label: 'Were there any safety incidents, hazards or near misses today?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'Please describe what happened', noteRequired: true, important: true },
+  { id: 'qualityIssue', label: 'Were any defects, damage or quality issues identified today?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'Please describe', noteRequired: true },
+  { id: 'goodDay', label: 'Did you have a good day?', options: ['Yes','No'], noteWhen: [], noteRequired: false }
+];
+
 /* ============================================================
    STATE
    ============================================================ */
@@ -465,6 +498,8 @@ let selectedName = null;
 let selectedRole = null;
 let selectedTasks = new Set();
 let yesNoState = { siteClean: null, toolsPacked: null, plantSecured: null, wasteSorted: null };
+let dailyState = {};
+DAILY_CHECKLIST.forEach(q => dailyState[q.id] = null);
 let pinBuffer = "";
 
 /* ============================================================
@@ -473,6 +508,7 @@ let pinBuffer = "";
 function init() {
   buildNameGrid();
   buildStageSelects();
+  buildDailyChecklist();
   loadJobs();
   document.getElementById('apprenticeCard').classList.add('hidden');
 }
@@ -513,6 +549,22 @@ function buildStageSelects() {
     sel.innerHTML = '<option value="">Select stage…</option>' +
       STAGES.map(s => `<option value="${s}">${s}</option>`).join('');
   });
+}
+
+function buildDailyChecklist() {
+  const container = document.getElementById('dailyChecklist');
+  container.innerHTML = DAILY_CHECKLIST.map(q => {
+    const buttons = q.options.map(opt => {
+      const cls = opt === 'Yes' ? 'sel-yes' : (opt === 'No' ? 'sel-no' : 'sel-na');
+      return `<button class="${cls}" onclick="setDaily('${q.id}','${opt}')">${opt}</button>`;
+    }).join('');
+    return `
+      <div class="gear-item${q.important ? ' important' : ''}" id="daily-${q.id}">
+        <label>${q.label}</label>
+        <div class="yesno" data-field="${q.id}">${buttons}</div>
+        <div class="note-box"><textarea placeholder="${q.notePrompt || ''}${q.noteRequired ? ' (required)' : ' (optional)'}" id="note-${q.id}"></textarea></div>
+      </div>`;
+  }).join('');
 }
 
 async function loadJobs() {
@@ -563,7 +615,7 @@ function toggleFlag(name) {
 }
 
 /* ============================================================
-   YES/NO/NA
+   YES/NO/NA — site clean + gear
    ============================================================ */
 function setYesNo(field, value) {
   yesNoState[field] = value;
@@ -578,6 +630,21 @@ function setYesNo(field, value) {
 }
 
 /* ============================================================
+   DAILY CHECKLIST (Tradify / office questions)
+   ============================================================ */
+function setDaily(id, value) {
+  dailyState[id] = value;
+  const container = document.querySelector(`#daily-${id} .yesno`);
+  container.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+  const cls = value === 'Yes' ? '.sel-yes' : (value === 'No' ? '.sel-no' : '.sel-na');
+  container.querySelector(cls).classList.add('selected');
+
+  const q = DAILY_CHECKLIST.find(q => q.id === id);
+  const noteBox = document.getElementById('daily-' + id).querySelector('.note-box');
+  noteBox.classList.toggle('show', q.noteWhen.includes(value));
+}
+
+/* ============================================================
    SUBMIT EOD
    ============================================================ */
 async function submitEod() {
@@ -587,6 +654,13 @@ async function submitEod() {
   const jobUpdate = document.getElementById('jobUpdate').value.trim();
   if (!jobUpdate) return alert('Job update is required — where the job is at, what\'s left, any blockers.');
 
+  for (const q of DAILY_CHECKLIST) {
+    if (!dailyState[q.id]) return alert('Please answer: ' + q.label);
+    if (q.noteRequired && q.noteWhen.includes(dailyState[q.id]) && !document.getElementById('note-' + q.id).value.trim()) {
+      return alert('Please add a note for: ' + q.label);
+    }
+  }
+
   for (const field of ['siteClean', 'toolsPacked', 'plantSecured', 'wasteSorted']) {
     if (!yesNoState[field]) return alert('Please answer all site clean + gear questions.');
     if ((yesNoState[field] === 'No' || yesNoState[field] === 'N/A') && !document.getElementById('note-' + field).value.trim()) {
@@ -594,6 +668,13 @@ async function submitEod() {
     }
   }
 
+  const dailyPayload = {};
+  DAILY_CHECKLIST.forEach(q => {
+    dailyPayload[q.id] = dailyState[q.id];
+    const noteEl = document.getElementById('note-' + q.id);
+    dailyPayload[q.id + 'Note'] = noteEl ? noteEl.value.trim() : '';
+  });
+  // Map to the specific field names Code.gs expects
   const payload = {
     action: 'eod',
     name: selectedName,
@@ -620,7 +701,29 @@ async function submitEod() {
     wasteSorted: yesNoState.wasteSorted,
     wasteSortedNote: document.getElementById('note-wasteSorted').value.trim(),
     otherNotes: document.getElementById('otherNotes').value.trim(),
-    apprenticeReflection: selectedRole === 'Apprentice' ? document.getElementById('apprenticeReflection').value.trim() : ''
+    apprenticeReflection: selectedRole === 'Apprentice' ? document.getElementById('apprenticeReflection').value.trim() : '',
+
+    tasksCompleted: dailyPayload.tasksCompleted,
+    tasksOutstanding: dailyPayload.tasksCompletedNote,
+    scheduleImpact: dailyPayload.scheduleImpact,
+    scheduleImpactDetail: dailyPayload.scheduleImpactNote,
+    photosTaken: dailyPayload.photosTaken,
+    photosUploaded: dailyPayload.photosUploaded,
+    timesheetsComplete: dailyPayload.timesheetsComplete,
+    timesheetsNote: dailyPayload.timesheetsCompleteNote,
+    clientHappy: dailyPayload.clientHappy,
+    clientHappyDetail: dailyPayload.clientHappyNote,
+    officeAction: dailyPayload.officeAction,
+    officeActionDetail: dailyPayload.officeActionNote,
+    materialsToOrder: dailyPayload.materialsToOrder,
+    materialsToOrderDetail: dailyPayload.materialsToOrderNote,
+    readyTomorrow: dailyPayload.readyTomorrow,
+    readyTomorrowDetail: dailyPayload.readyTomorrowNote,
+    safetyIncident: dailyPayload.safetyIncident,
+    safetyIncidentDetail: dailyPayload.safetyIncidentNote,
+    qualityIssue: dailyPayload.qualityIssue,
+    qualityIssueDetail: dailyPayload.qualityIssueNote,
+    goodDay: dailyPayload.goodDay
   };
 
   const btn = document.getElementById('submitBtn');
@@ -646,6 +749,7 @@ async function submitEod() {
 function resetForm() {
   selectedName = null; selectedRole = null; selectedTasks = new Set();
   yesNoState = { siteClean: null, toolsPacked: null, plantSecured: null, wasteSorted: null };
+  DAILY_CHECKLIST.forEach(q => dailyState[q.id] = null);
   document.querySelectorAll('#nameGrid .pill').forEach(b => b.classList.remove('selected'));
   document.getElementById('jobSelect').value = '';
   document.querySelectorAll('#taskList input').forEach(c => c.checked = false);
