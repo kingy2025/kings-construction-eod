@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Kings Construction — EOD Sign-off</title>
+<style>
+  :root {
+    --brand: #1b3a5c;
+    --brand-light: #2c5480;
+    --accent: #e0a500;
+    --danger: #c0392b;
+    --ok: #2e7d32;
+    --bg: #f2f4f7;
+    --card: #ffffff;
+    --border: #d8dee5;
+    --text: #1a1f26;
+    --muted: #667085;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding-bottom: 80px;
+  }
+  header {
+    background: var(--brand);
+    color: #fff;
+    padding: 18px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+  header h1 { margin: 0; font-size: 20px; }
+  header .sub { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+
+  nav.tabs {
+    display: flex;
+    background: var(--brand-light);
+    position: sticky;
+    top: 62px;
+    z-index: 19;
+  }
+  nav.tabs button {
+    flex: 1;
+    padding: 14px 4px;
+    background: none;
+    border: none;
+    color: #fff;
+    opacity: 0.7;
+    font-size: 15px;
+    font-weight: 600;
+    border-bottom: 3px solid transparent;
+  }
+  nav.tabs button.active {
+    opacity: 1;
+    border-bottom: 3px solid var(--accent);
+  }
+
+  main { padding: 16px; max-width: 640px; margin: 0 auto; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: 16px;
+    margin: 0 0 12px 0;
+    color: var(--brand);
+  }
+  label { display: block; font-size: 14px; font-weight: 600; margin: 12px 0 6px; }
+  label:first-child { margin-top: 0; }
+
+  .name-grid, .job-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .pill {
+    padding: 14px 18px;
+    border-radius: 999px;
+    border: 2px solid var(--border);
+    background: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    min-height: 48px;
+  }
+  .pill.selected {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: #fff;
+  }
+  .role-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 14px 0 6px; }
+  .role-label:first-child { margin-top: 0; }
+
+  select, textarea, input[type=text], input[type=number] {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+    font-family: inherit;
+  }
+  textarea { min-height: 90px; resize: vertical; }
+
+  .task-list label.check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+  }
+  .task-list label.check:last-child { border-bottom: none; }
+  input[type=checkbox], input[type=radio] { width: 22px; height: 22px; flex-shrink: 0; }
+
+  .highlight-box {
+    background: #fff8dc;
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .highlight-box label { color: #6b5200; }
+  .required-star { color: var(--danger); }
+
+  .flag-item { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .flag-item.active { border-color: var(--danger); background: #fdf1f0; }
+  .flag-item .flag-header { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .flag-item .flag-detail { margin-top: 10px; }
+
+  .yesno { display: flex; gap: 8px; }
+  .yesno button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    background: #fff;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .yesno button.sel-yes.selected { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .yesno button.sel-no.selected { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .yesno button.sel-na.selected { background: var(--muted); border-color: var(--muted); color: #fff; }
+
+  .gear-item { margin-bottom: 16px; }
+  .gear-item .note-box { margin-top: 8px; display: none; }
+  .gear-item .note-box.show { display: block; }
+
+  .btn-primary {
+    width: 100%;
+    padding: 16px;
+    background: var(--brand);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .btn-primary:disabled { opacity: 0.5; }
+  .btn-secondary {
+    width: 100%;
+    padding: 14px;
+    background: #fff;
+    color: var(--brand);
+    border: 2px solid var(--brand);
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    margin-top: 8px;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 16px;
+    right: 16px;
+    background: var(--ok);
+    color: #fff;
+    padding: 14px;
+    border-radius: 10px;
+    text-align: center;
+    font-weight: 700;
+    z-index: 50;
+    display: none;
+  }
+  .toast.show { display: block; }
+  .toast.error { background: var(--danger); }
+
+  .pin-pad { max-width: 280px; margin: 40px auto; text-align: center; }
+  .pin-dots { font-size: 32px; letter-spacing: 10px; margin: 20px 0; min-height: 40px; }
+  .pin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .pin-grid button {
+    padding: 20px;
+    font-size: 22px;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    background: #fff;
+    font-weight: 700;
+  }
+
+  .summary-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+  .summary-row:last-child { border-bottom: none; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .badge.ok { background: #e6f4ea; color: var(--ok); }
+  .badge.warn { background: #fdecea; color: var(--danger); }
+
+  .flag-log-item { border-left: 4px solid var(--danger); padding: 8px 12px; margin-bottom: 10px; background: #fdf1f0; border-radius: 0 8px 8px 0; }
+  .job-item { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .job-item.done { opacity: 0.6; text-decoration: line-through; }
+
+  .hidden { display: none !important; }
+  .helper { font-size: 13px; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Kings Construction</h1>
+  <div class="sub">Crew end-of-day sign-off</div>
+</header>
+
+<nav class="tabs">
+  <button id="tabBtnCrew" class="active" onclick="showTab('crew')">Crew</button>
+  <button id="tabBtnSup" onclick="showTab('sup')">Supervisor</button>
+  <button id="tabBtnPunch" onclick="showTab('punch')">Punch-list</button>
+</nav>
+
+<main>
+
+  <!-- ============ CREW TAB ============ -->
+  <div id="tab-crew">
+
+    <div class="card">
+      <h2>On site</h2>
+      <label>Your name</label>
+      <div id="nameGrid"></div>
+
+      <label>Job</label>
+      <select id="jobSelect"><option value="">Loading jobs…</option></select>
+    </div>
+
+    <div class="card">
+      <h2>Today's work</h2>
+      <label>Tasks done</label>
+      <div class="task-list" id="taskList">
+        <label class="check"><input type="checkbox" value="Demolition/strip-out"> Demolition / strip-out</label>
+        <label class="check"><input type="checkbox" value="Carpentry/framing"> Carpentry / framing</label>
+        <label class="check"><input type="checkbox" value="Plastering"> Plastering</label>
+        <label class="check"><input type="checkbox" value="Painting"> Painting</label>
+        <label class="check"><input type="checkbox" value="Tiling/waterproofing"> Tiling / waterproofing</label>
+        <label class="check"><input type="checkbox" value="Fix-out/joinery"> Fix-out / joinery</label>
+        <label class="check"><input type="checkbox" value="Site clean/waste"> Site clean / waste removal</label>
+        <label class="check"><input type="checkbox" value="Inspection/reporting"> Inspection / reporting</label>
+      </div>
+
+      <label>Stage of works</label>
+      <select id="stageSelect"></select>
+    </div>
+
+    <div class="card highlight-box">
+      <label>Job update <span class="required-star">*</span> — where's the job at, what's left, any blockers?</label>
+      <textarea id="jobUpdate" placeholder="e.g. Demo complete in bathroom, plaster booked for Thursday, waiting on tile delivery..."></textarea>
+    </div>
+
+    <div class="card">
+      <h2>Flag to the boss</h2>
+
+      <div class="flag-item" id="flagDamage">
+        <div class="flag-header"><input type="checkbox" id="chkDamage" onchange="toggleFlag('Damage')"> Damage / make-good needed</div>
+        <div class="flag-detail hidden" id="detailDamage">
+          <textarea id="detailDamageText" placeholder="What's damaged, where, how bad?"></textarea>
+        </div>
+      </div>
+
+      <div class="flag-item" id="flagVariation">
+        <div class="flag-header"><input type="checkbox" id="chkVariation" onchange="toggleFlag('Variation')"> Variation (extra work/hours)</div>
+        <div class="flag-detail hidden" id="detailVariation">
+          <textarea id="detailVariationText" placeholder="What extra work and why?"></textarea>
+          <label>Extra hours logged</label>
+          <input type="number" id="variationHours" min="0" step="0.5" placeholder="e.g. 2">
+        </div>
+      </div>
+
+      <div class="flag-item" id="flagHoldUp">
+        <div class="flag-header"><input type="checkbox" id="chkHoldUp" onchange="toggleFlag('HoldUp')"> Hold-up (weather, other trades, inspections, deliveries)</div>
+        <div class="flag-detail hidden" id="detailHoldUp">
+          <textarea id="detailHoldUpText" placeholder="What held things up?"></textarea>
+        </div>
+      </div>
+
+      <div class="flag-item" id="flagMaterials">
+        <div class="flag-header"><input type="checkbox" id="chkMaterials" onchange="toggleFlag('Materials')"> Materials running low</div>
+        <div class="flag-detail hidden" id="detailMaterials">
+          <textarea id="detailMaterialsText" placeholder="What's needed?"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Site clean + gear</h2>
+      <div class="gear-item" id="gear-siteClean">
+        <label>Site left clean & safe</label>
+        <div class="yesno" data-field="siteClean">
+          <button class="sel-yes" onclick="setYesNo('siteClean','Yes')">Yes</button>
+          <button class="sel-no" onclick="setYesNo('siteClean','No')">No</button>
+          <button class="sel-na" onclick="setYesNo('siteClean','N/A')">N/A</button>
+        </div>
+        <div class="note-box"><textarea placeholder="Why not? (required)" id="note-siteClean"></textarea></div>
+      </div>
+      <div class="gear-item" id="gear-toolsPacked">
+        <label>Tools packed</label>
+        <div class="yesno" data-field="toolsPacked">
+          <button class="sel-yes" onclick="setYesNo('toolsPacked','Yes')">Yes</button>
+          <button class="sel-no" onclick="setYesNo('toolsPacked','No')">No</button>
+          <button class="sel-na" onclick="setYesNo('toolsPacked','N/A')">N/A</button>
+        </div>
+        <div class="note-box"><textarea placeholder="Why not? (required)" id="note-toolsPacked"></textarea></div>
+      </div>
+      <div class="gear-item" id="gear-plantSecured">
+        <label>Plant / equipment secured</label>
+        <div class="yesno" data-field="plantSecured">
+          <button class="sel-yes" onclick="setYesNo('plantSecured','Yes')">Yes</button>
+          <button class="sel-no" onclick="setYesNo('plantSecured','No')">No</button>
+          <button class="sel-na" onclick="setYesNo('plantSecured','N/A')">N/A</button>
+        </div>
+        <div class="note-box"><textarea placeholder="Why not? (required)" id="note-plantSecured"></textarea></div>
+      </div>
+      <div class="gear-item" id="gear-wasteSorted">
+        <label>Waste sorted</label>
+        <div class="yesno" data-field="wasteSorted">
+          <button class="sel-yes" onclick="setYesNo('wasteSorted','Yes')">Yes</button>
+          <button class="sel-no" onclick="setYesNo('wasteSorted','No')">No</button>
+          <button class="sel-na" onclick="setYesNo('wasteSorted','N/A')">N/A</button>
+        </div>
+        <div class="note-box"><textarea placeholder="Why not? (required)" id="note-wasteSorted"></textarea></div>
+      </div>
+    </div>
+
+    <div class="card" id="apprenticeCard">
+      <h2>Apprentice reflection</h2>
+      <label>What's one thing you learned or found tricky today?</label>
+      <textarea id="apprenticeReflection"></textarea>
+    </div>
+
+    <div class="card">
+      <h2>Anything else</h2>
+      <textarea id="otherNotes" placeholder="Optional notes"></textarea>
+    </div>
+
+    <button class="btn-primary" id="submitBtn" onclick="submitEod()">Submit end-of-day</button>
+  </div>
+
+  <!-- ============ SUPERVISOR TAB ============ -->
+  <div id="tab-sup" class="hidden">
+    <div id="pinScreen" class="card pin-pad">
+      <h2>Supervisor PIN</h2>
+      <div class="pin-dots" id="pinDots"></div>
+      <div class="pin-grid">
+        <button onclick="pinPress('1')">1</button><button onclick="pinPress('2')">2</button><button onclick="pinPress('3')">3</button>
+        <button onclick="pinPress('4')">4</button><button onclick="pinPress('5')">5</button><button onclick="pinPress('6')">6</button>
+        <button onclick="pinPress('7')">7</button><button onclick="pinPress('8')">8</button><button onclick="pinPress('9')">9</button>
+        <button onclick="pinClear()">Clear</button><button onclick="pinPress('0')">0</button><button onclick="pinBackspace()">⌫</button>
+      </div>
+    </div>
+
+    <div id="supDashboard" class="hidden">
+      <div class="card">
+        <h2>Today — <span id="dashDate"></span></h2>
+        <div class="summary-row"><span>Submitted</span><span id="dashSubmittedCount">—</span></div>
+        <div class="summary-row"><span>Outstanding</span><span id="dashOutstanding">—</span></div>
+        <div class="summary-row"><span>Total variation hours</span><span id="dashVarHours">—</span></div>
+        <button class="btn-secondary" onclick="loadSupervisorSummary()">Refresh</button>
+      </div>
+      <div class="card">
+        <h2>Flags raised today</h2>
+        <div id="dashFlags"><p class="helper">Loading…</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PUNCH-LIST TAB ============ -->
+  <div id="tab-punch" class="hidden">
+    <div class="card">
+      <h2>Select job</h2>
+      <select id="punchJobSelect"><option value="">Loading jobs…</option></select>
+    </div>
+
+    <div class="card">
+      <h2>Add defect / touch-up item</h2>
+      <label>Item</label>
+      <input type="text" id="punchItem" placeholder="e.g. Paint touch-up hallway">
+      <label>Description</label>
+      <textarea id="punchDescription"></textarea>
+      <label>Your name</label>
+      <input type="text" id="punchAddedBy" placeholder="Your name">
+      <button class="btn-primary" onclick="addPunchItem()">Add to punch-list</button>
+    </div>
+
+    <div class="card">
+      <h2>Open items</h2>
+      <div id="punchList"><p class="helper">Select a job to see its punch-list.</p></div>
+    </div>
+
+    <div class="card">
+      <h2>Stage sign-off (supervisor)</h2>
+      <label>Stage</label>
+      <select id="signoffStage"></select>
+      <label>Notes</label>
+      <textarea id="signoffNotes"></textarea>
+      <label>Supervisor name</label>
+      <input type="text" id="signoffSupervisor" placeholder="Your name">
+      <button class="btn-primary" onclick="submitSignoff()">Sign off stage</button>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   EDITABLE SETTINGS — change these any time, no other code needed
+   ============================================================ */
+const API_URL = "https://script.google.com/macros/s/AKfycbz-OJnwhYX-tW8FX6ZvMU034YlwxmbZtuKaCW0NVMRdmblDkdW2FYJwrSPz95ullLYA/exec";
+
+const SUPERVISOR_PIN = "2580";
+
+const CREW = {
+  "Supervisors": [
+    { name: "Matt", role: "Supervisor" },
+    { name: "Jackson", role: "Supervisor" }
+  ],
+  "Carpenters": [
+    { name: "Ash", role: "Apprentice" },
+    { name: "Izzy", role: "Apprentice" },
+    { name: "Simon", role: "Carpenter" },
+    { name: "Rafa", role: "Carpenter" }
+  ]
+};
+
+const STAGES = [
+  "Site protection / setup",
+  "Demolition / strip-out",
+  "Drying / remediation",
+  "Framing & carpentry repairs",
+  "Insulation",
+  "Plastering / lining",
+  "Waterproofing & tiling",
+  "Painting",
+  "Fix-out (joinery, fixtures, fittings)",
+  "Final clean & handover",
+  "Defects / make-good"
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let selectedName = null;
+let selectedRole = null;
+let selectedTasks = new Set();
+let yesNoState = { siteClean: null, toolsPacked: null, plantSecured: null, wasteSorted: null };
+let pinBuffer = "";
+
+/* ============================================================
+   INIT
+   ============================================================ */
+function init() {
+  buildNameGrid();
+  buildStageSelects();
+  loadJobs();
+  document.getElementById('apprenticeCard').classList.add('hidden');
+}
+
+function buildNameGrid() {
+  const grid = document.getElementById('nameGrid');
+  grid.innerHTML = "";
+  Object.keys(CREW).forEach(group => {
+    const label = document.createElement('div');
+    label.className = 'role-label';
+    label.textContent = group;
+    grid.appendChild(label);
+    const wrap = document.createElement('div');
+    wrap.className = 'name-grid';
+    CREW[group].forEach(person => {
+      const btn = document.createElement('button');
+      btn.className = 'pill';
+      btn.textContent = person.name;
+      btn.type = 'button';
+      btn.onclick = () => selectName(person.name, person.role, btn);
+      wrap.appendChild(btn);
+    });
+    grid.appendChild(wrap);
+  });
+}
+
+function selectName(name, role, btnEl) {
+  selectedName = name;
+  selectedRole = role;
+  document.querySelectorAll('#nameGrid .pill').forEach(b => b.classList.remove('selected'));
+  btnEl.classList.add('selected');
+  document.getElementById('apprenticeCard').classList.toggle('hidden', role !== 'Apprentice');
+}
+
+function buildStageSelects() {
+  ['stageSelect', 'signoffStage'].forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = '<option value="">Select stage…</option>' +
+      STAGES.map(s => `<option value="${s}">${s}</option>`).join('');
+  });
+}
+
+async function loadJobs() {
+  try {
+    const res = await fetch(`${API_URL}?action=jobs`);
+    const data = await res.json();
+    const jobs = data.jobs || [];
+    const opts = '<option value="">Select job…</option>' + jobs.map(j => `<option value="${j}">${j}</option>`).join('');
+    document.getElementById('jobSelect').innerHTML = opts;
+    document.getElementById('punchJobSelect').innerHTML = opts;
+  } catch (e) {
+    document.getElementById('jobSelect').innerHTML = '<option value="">Could not load jobs — check connection</option>';
+  }
+}
+
+/* ============================================================
+   TABS
+   ============================================================ */
+function showTab(tab) {
+  document.getElementById('tab-crew').classList.toggle('hidden', tab !== 'crew');
+  document.getElementById('tab-sup').classList.toggle('hidden', tab !== 'sup');
+  document.getElementById('tab-punch').classList.toggle('hidden', tab !== 'punch');
+  document.getElementById('tabBtnCrew').classList.toggle('active', tab === 'crew');
+  document.getElementById('tabBtnSup').classList.toggle('active', tab === 'sup');
+  document.getElementById('tabBtnPunch').classList.toggle('active', tab === 'punch');
+  if (tab === 'punch') loadPunchlistForSelectedJob();
+}
+
+/* ============================================================
+   TASK CHECKLIST
+   ============================================================ */
+document.addEventListener('change', (e) => {
+  if (e.target.closest('#taskList')) {
+    const val = e.target.value;
+    if (e.target.checked) selectedTasks.add(val); else selectedTasks.delete(val);
+  }
+});
+
+/* ============================================================
+   FLAGS
+   ============================================================ */
+function toggleFlag(name) {
+  const chk = document.getElementById('chk' + name);
+  const detail = document.getElementById('detail' + name);
+  const item = document.getElementById('flag' + name);
+  detail.classList.toggle('hidden', !chk.checked);
+  item.classList.toggle('active', chk.checked);
+}
+
+/* ============================================================
+   YES/NO/NA
+   ============================================================ */
+function setYesNo(field, value) {
+  yesNoState[field] = value;
+  const container = document.querySelector(`.yesno[data-field="${field}"]`);
+  container.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+  if (value === 'Yes') container.querySelector('.sel-yes').classList.add('selected');
+  if (value === 'No') container.querySelector('.sel-no').classList.add('selected');
+  if (value === 'N/A') container.querySelector('.sel-na').classList.add('selected');
+
+  const noteBox = document.getElementById('gear-' + field).querySelector('.note-box');
+  noteBox.classList.toggle('show', value === 'No' || value === 'N/A');
+}
+
+/* ============================================================
+   SUBMIT EOD
+   ============================================================ */
+async function submitEod() {
+  if (!selectedName) return alert('Please select your name.');
+  const job = document.getElementById('jobSelect').value;
+  if (!job) return alert('Please select a job.');
+  const jobUpdate = document.getElementById('jobUpdate').value.trim();
+  if (!jobUpdate) return alert('Job update is required — where the job is at, what\'s left, any blockers.');
+
+  for (const field of ['siteClean', 'toolsPacked', 'plantSecured', 'wasteSorted']) {
+    if (!yesNoState[field]) return alert('Please answer all site clean + gear questions.');
+    if ((yesNoState[field] === 'No' || yesNoState[field] === 'N/A') && !document.getElementById('note-' + field).value.trim()) {
+      return alert('Please explain why for: ' + field);
+    }
+  }
+
+  const payload = {
+    action: 'eod',
+    name: selectedName,
+    role: selectedRole,
+    job: job,
+    tasksDone: Array.from(selectedTasks),
+    stageOfWorks: document.getElementById('stageSelect').value,
+    jobUpdate: jobUpdate,
+    flagDamage: document.getElementById('chkDamage').checked,
+    flagDamageDetail: document.getElementById('detailDamageText').value.trim(),
+    flagVariation: document.getElementById('chkVariation').checked,
+    flagVariationDetail: document.getElementById('detailVariationText').value.trim(),
+    variationHours: document.getElementById('variationHours').value,
+    flagHoldUp: document.getElementById('chkHoldUp').checked,
+    flagHoldUpDetail: document.getElementById('detailHoldUpText').value.trim(),
+    flagMaterials: document.getElementById('chkMaterials').checked,
+    flagMaterialsDetail: document.getElementById('detailMaterialsText').value.trim(),
+    siteClean: yesNoState.siteClean,
+    siteCleanNote: document.getElementById('note-siteClean').value.trim(),
+    toolsPacked: yesNoState.toolsPacked,
+    toolsPackedNote: document.getElementById('note-toolsPacked').value.trim(),
+    plantSecured: yesNoState.plantSecured,
+    plantSecuredNote: document.getElementById('note-plantSecured').value.trim(),
+    wasteSorted: yesNoState.wasteSorted,
+    wasteSortedNote: document.getElementById('note-wasteSorted').value.trim(),
+    otherNotes: document.getElementById('otherNotes').value.trim(),
+    apprenticeReflection: selectedRole === 'Apprentice' ? document.getElementById('apprenticeReflection').value.trim() : ''
+  };
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  try {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    });
+    showToast('Submitted — nice work!');
+    resetForm();
+  } catch (e) {
+    showToast('Could not submit — check your connection and try again.', true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Submit end-of-day';
+  }
+}
+
+function resetForm() {
+  selectedName = null; selectedRole = null; selectedTasks = new Set();
+  yesNoState = { siteClean: null, toolsPacked: null, plantSecured: null, wasteSorted: null };
+  document.querySelectorAll('#nameGrid .pill').forEach(b => b.classList.remove('selected'));
+  document.getElementById('jobSelect').value = '';
+  document.querySelectorAll('#taskList input').forEach(c => c.checked = false);
+  document.getElementById('stageSelect').value = '';
+  document.getElementById('jobUpdate').value = '';
+  ['Damage','Variation','HoldUp','Materials'].forEach(f => {
+    document.getElementById('chk' + f).checked = false;
+    toggleFlag(f);
+    const t = document.getElementById('detail' + f + 'Text');
+    if (t) t.value = '';
+  });
+  document.getElementById('variationHours').value = '';
+  document.querySelectorAll('.yesno button').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.note-box').forEach(n => { n.classList.remove('show'); n.querySelector('textarea').value = ''; });
+  document.getElementById('otherNotes').value = '';
+  document.getElementById('apprenticeReflection').value = '';
+  document.getElementById('apprenticeCard').classList.add('hidden');
+  window.scrollTo(0, 0);
+}
+
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+/* ============================================================
+   SUPERVISOR TAB
+   ============================================================ */
+function pinPress(d) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += d;
+  renderPinDots();
+  if (pinBuffer.length === 4) checkPin();
+}
+function pinBackspace() { pinBuffer = pinBuffer.slice(0, -1); renderPinDots(); }
+function pinClear() { pinBuffer = ""; renderPinDots(); }
+function renderPinDots() {
+  document.getElementById('pinDots').textContent = '●'.repeat(pinBuffer.length) + '○'.repeat(4 - pinBuffer.length);
+}
+function checkPin() {
+  if (pinBuffer === SUPERVISOR_PIN) {
+    document.getElementById('pinScreen').classList.add('hidden');
+    document.getElementById('supDashboard').classList.remove('hidden');
+    loadSupervisorSummary();
+  } else {
+    showToast('Wrong PIN', true);
+    setTimeout(() => { pinBuffer = ""; renderPinDots(); }, 600);
+  }
+}
+
+async function loadSupervisorSummary() {
+  const allNames = Object.values(CREW).flat().map(p => p.name);
+  document.getElementById('dashDate').textContent = new Date().toLocaleDateString('en-AU');
+  try {
+    const res = await fetch(`${API_URL}?action=summary`);
+    const data = await res.json();
+    document.getElementById('dashSubmittedCount').textContent = `${data.submitted.length} / ${allNames.length}`;
+    const outstanding = allNames.filter(n => !data.submitted.includes(n));
+    document.getElementById('dashOutstanding').innerHTML = outstanding.length
+      ? outstanding.map(n => `<span class="badge warn">${n}</span>`).join(' ')
+      : '<span class="badge ok">All in</span>';
+    document.getElementById('dashVarHours').textContent = data.totalVariationHours || 0;
+
+    const flagsEl = document.getElementById('dashFlags');
+    if (!data.flags.length) {
+      flagsEl.innerHTML = '<p class="helper">No flags today.</p>';
+    } else {
+      flagsEl.innerHTML = data.flags.map(f => `
+        <div class="flag-log-item">
+          <strong>${f.type}</strong> — ${f.name} (${f.job})<br>
+          <span class="helper">${f.detail || 'No detail provided'}</span>
+        </div>`).join('');
+    }
+  } catch (e) {
+    showToast('Could not load summary', true);
+  }
+}
+
+/* ============================================================
+   PUNCH-LIST TAB
+   ============================================================ */
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'punchJobSelect') loadPunchlistForSelectedJob();
+});
+
+async function loadPunchlistForSelectedJob() {
+  const job = document.getElementById('punchJobSelect').value;
+  const listEl = document.getElementById('punchList');
+  if (!job) { listEl.innerHTML = '<p class="helper">Select a job to see its punch-list.</p>'; return; }
+  listEl.innerHTML = '<p class="helper">Loading…</p>';
+  try {
+    const res = await fetch(`${API_URL}?action=punchlist&job=${encodeURIComponent(job)}`);
+    const data = await res.json();
+    if (!data.items.length) { listEl.innerHTML = '<p class="helper">No items yet.</p>'; return; }
+    listEl.innerHTML = data.items.map(it => `
+      <div class="job-item ${it.Status === 'Done' ? 'done' : ''}">
+        <strong>${it.Item || it.Stage}</strong> <span class="badge ${it.Status === 'Done' ? 'ok' : 'warn'}">${it.Status}</span><br>
+        <span class="helper">${it.Description || ''}</span>
+      </div>`).join('');
+  } catch (e) {
+    listEl.innerHTML = '<p class="helper">Could not load punch-list.</p>';
+  }
+}
+
+async function addPunchItem() {
+  const job = document.getElementById('punchJobSelect').value;
+  const item = document.getElementById('punchItem').value.trim();
+  const description = document.getElementById('punchDescription').value.trim();
+  const addedBy = document.getElementById('punchAddedBy').value.trim();
+  if (!job) return alert('Select a job first.');
+  if (!item) return alert('Enter an item.');
+  try {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'punchlist_add', job, item, description, addedBy })
+    });
+    document.getElementById('punchItem').value = '';
+    document.getElementById('punchDescription').value = '';
+    showToast('Added to punch-list');
+    loadPunchlistForSelectedJob();
+  } catch (e) {
+    showToast('Could not add item', true);
+  }
+}
+
+async function submitSignoff() {
+  const job = document.getElementById('punchJobSelect').value;
+  const stage = document.getElementById('signoffStage').value;
+  const notes = document.getElementById('signoffNotes').value.trim();
+  const supervisorName = document.getElementById('signoffSupervisor').value.trim();
+  if (!job) return alert('Select a job first.');
+  if (!stage) return alert('Select a stage.');
+  if (!supervisorName) return alert('Supervisor name is required for sign-off.');
+  try {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'stage_signoff', job, stage, notes, supervisorName })
+    });
+    document.getElementById('signoffNotes').value = '';
+    document.getElementById('signoffSupervisor').value = '';
+    showToast('Stage signed off');
+    loadPunchlistForSelectedJob();
+  } catch (e) {
+    showToast('Could not sign off', true);
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>
