@@ -871,6 +871,13 @@ function init() {
   initJsaCanvas();
   loadJobs();
   document.getElementById('apprenticeCard').classList.add('hidden');
+
+  // Deep-link support: opening the app with #morning / #crew / #sup / #punch
+  // (e.g. from an SMS reminder link) jumps straight to that tab.
+  const hashTab = window.location.hash.replace('#', '');
+  if (['morning', 'crew', 'sup', 'punch'].includes(hashTab)) {
+    showTab(hashTab);
+  }
 }
 
 function buildNameGrid() {
