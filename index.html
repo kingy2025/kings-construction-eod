@@ -4,18 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Kings Construction — EOD Sign-off</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --brand: #1b3a5c;
-    --brand-light: #2c5480;
-    --accent: #e0a500;
+    --brand: #181818;
+    --brand-light: #2a2a2a;
+    --accent: #f2c56b;
+    --accent-dark: #d9a83f;
     --danger: #c0392b;
     --ok: #2e7d32;
-    --bg: #f2f4f7;
+    --bg: #f2f1ee;
     --card: #ffffff;
-    --border: #d8dee5;
-    --text: #1a1f26;
-    --muted: #667085;
+    --border: #ded9d0;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
@@ -25,6 +29,7 @@
     color: var(--text);
     padding-bottom: 80px;
   }
+  h1, .card h2 { font-family: "Playfair Display", Georgia, serif; }
   header {
     background: var(--brand);
     color: #fff;
@@ -33,7 +38,7 @@
     top: 0;
     z-index: 20;
   }
-  header h1 { margin: 0; font-size: 20px; }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: 0.02em; }
   header .sub { font-size: 13px; opacity: 0.85; margin-top: 2px; }
 
   nav.tabs {
@@ -277,6 +282,26 @@
 
   .hidden { display: none !important; }
   .helper { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  /* Morning JSA / SWMS + signature pad */
+  .ppe-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ppe-chip { background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
+  .jsa-step { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid #eee; }
+  .jsa-step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .jsa-step-title { font-weight: 700; margin-bottom: 8px; font-size: 15px; }
+  .jsa-col { margin-bottom: 8px; font-size: 13px; }
+  .jsa-col:last-child { margin-bottom: 0; }
+  .jsa-col b.hz { color: var(--danger); }
+  .jsa-col b.ctl { color: var(--ok); }
+  .jsa-col ul { margin: 4px 0 0 18px; padding: 0; }
+  .jsa-col li { margin-bottom: 3px; }
+  .jsa-crew-pill.signed { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .jsa-crew-pill.signed::after { content: ' ✓'; }
+  .jsa-crew-pill.active-signing { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .sig-canvas-wrap { border: 2px solid var(--border); border-radius: 10px; overflow: hidden; background: #fff; }
+  #jsaCanvas { display: block; width: 100%; height: 160px; touch-action: none; }
+  .sig-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .sig-actions button { flex: 1; }
 </style>
 </head>
 <body>
@@ -287,12 +312,53 @@
 </header>
 
 <nav class="tabs">
+  <button id="tabBtnMorning" onclick="showTab('morning')">Morning</button>
   <button id="tabBtnCrew" class="active" onclick="showTab('crew')">Crew</button>
   <button id="tabBtnSup" onclick="showTab('sup')">Supervisor</button>
   <button id="tabBtnPunch" onclick="showTab('punch')">Punch-list</button>
 </nav>
 
 <main>
+
+  <!-- ============ MORNING JSA TAB ============ -->
+  <div id="tab-morning" class="hidden">
+
+    <div class="card">
+      <h2>Morning JSA / SWMS sign-on</h2>
+      <div class="card-sub">CJP-01 · General construction — read before starting work</div>
+      <label>Job</label>
+      <select id="jsaJobSelect"><option value="">Loading jobs…</option></select>
+    </div>
+
+    <div class="card">
+      <h2>PPE required</h2>
+      <div class="ppe-list" id="jsaPpeList"></div>
+    </div>
+
+    <div class="card">
+      <h2>Steps, hazards &amp; controls</h2>
+      <div id="jsaStepsList"></div>
+    </div>
+
+    <div class="card">
+      <h2>Crew signing on today</h2>
+      <div class="card-sub">Tap your name, then sign below</div>
+      <div id="jsaCrewGrid"></div>
+    </div>
+
+    <div class="card hidden" id="jsaSignPad">
+      <h2>Signature — <span id="jsaSignName"></span></h2>
+      <div class="sig-canvas-wrap">
+        <canvas id="jsaCanvas"></canvas>
+      </div>
+      <div class="sig-actions">
+        <button class="btn-secondary" type="button" onclick="clearJsaCanvas()">Clear</button>
+        <button class="btn-primary" type="button" onclick="saveJsaSignature()">Save signature</button>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="jsaSubmitBtn" onclick="submitJsaSignon()">Submit morning JSA sign-on</button>
+  </div>
 
   <!-- ============ CREW TAB ============ -->
   <div id="tab-crew">
@@ -708,6 +774,63 @@ const KPI_TIERS = [
   { min: 0, max: 20, label: 'Performance improvement plan required', bonus: 0 }
 ];
 
+// Morning JSA / SWMS — CJP-01 General Construction.
+// PPE list + hazard/control steps shown to crew each morning before
+// starting work. Edit freely — the form picks this up automatically.
+const JSA_PPE = [
+  'Safety footwear (steel-cap boots)',
+  'Hi-vis clothing',
+  'Safety glasses',
+  'Hearing protection with power tools',
+  'P1/P2 dust mask — cutting, sanding, demolition',
+  'Gloves for material handling',
+  'Hard hat where overhead hazards exist',
+  'Fall-arrest harness for work at height where required'
+];
+
+const JSA_STEPS = [
+  {
+    title: 'Site setup & access',
+    hazards: ['Slips, trips over gear, leads and debris', 'Manual handling of tools, materials and ladders', 'Unfamiliar site hazards'],
+    controls: ['Keep walkways and exits clear', 'Store materials tidily; run leads overhead or tape down', 'Walk the site and identify hazards before starting', 'Spill kit and first-aid on site']
+  },
+  {
+    title: 'Manual handling & materials',
+    hazards: ['Back/muscle strain lifting heavy or awkward materials', 'Crush injuries moving sheet materials, timber, tiles'],
+    controls: ['Team-lift or use trolleys/mechanical aids for heavy items', 'Plan the lift, keep loads close to the body', 'Rotate tasks to avoid fatigue']
+  },
+  {
+    title: 'Demolition & strip-out',
+    hazards: ['Structural collapse if load-bearing elements are removed', 'Dust inhalation (may contain silica)', 'Nails, screws and sharp debris'],
+    controls: ['Confirm load-bearing structure before removing anything', 'Wet-cut or use dust extraction', 'P2 respirator and safety glasses', 'Sharps swept up and binned immediately']
+  },
+  {
+    title: 'Working at height',
+    hazards: ['Falls from ladders, roofs, scaffolding, incomplete floors/stairwells'],
+    controls: ['Use podium/platform steps or scaffold in preference to ladders', 'Maintain 3 points of contact, no over-reaching', 'Inspect ladders/scaffold before use; tag out damaged gear', 'Harness and anchor point for roof work']
+  },
+  {
+    title: 'Power tools & equipment',
+    hazards: ['Lacerations, kickback, entanglement', 'Electric shock from damaged leads/tools'],
+    controls: ['Guards fitted and in place at all times', 'Visually inspect tools and test-and-tag leads before use', 'RCD/safety switch on all power tools', 'Correct PPE for the tool in use (glasses, gloves, hearing protection)']
+  },
+  {
+    title: 'Electrical & services awareness',
+    hazards: ['Contact with live wiring, gas or water lines when cutting/drilling'],
+    controls: ['Locate services before cutting/drilling into walls, floors or ceilings', 'Isolate power to the work area where required', 'Electrical and plumbing connections only by licensed trades']
+  },
+  {
+    title: 'Working near clients & the public',
+    hazards: ['Occupants/public struck by falling objects, tools or debris', 'Disturbance to occupied homes'],
+    controls: ['Exclusion zones and signage around active work areas', 'Keep noise to reasonable hours; communicate with occupants', 'Secure tools/materials so nothing can fall or be accessed by children']
+  },
+  {
+    title: 'Housekeeping & end of day',
+    hazards: ['Trip hazards from tools, leads and offcuts left lying around', 'Fire risk from oily rags or waste'],
+    controls: ['Clear walkways and pack away tools at the end of each day', 'Waste sorted and bins/skips used correctly', 'Site left clean, tidy and secure before leaving']
+  }
+];
+
 /* ============================================================
    STATE
    ============================================================ */
@@ -719,6 +842,10 @@ let kpiState = {};
 WEEKLY_KPI.forEach(k => kpiState[k.id] = null);
 let weeklyCheckState = { hoursCorrect: null, receiptsUploaded: null };
 let pinBuffer = "";
+let jsaState = { currentWorker: null, signed: {} };
+let jsaDrawing = false;
+let jsaLastPoint = null;
+let jsaHasSignature = false;
 
 /* ============================================================
    INIT
@@ -730,6 +857,9 @@ function init() {
   buildWeeklyKpiCrewSelect();
   buildWeeklyKpi();
   setWeekDefaults();
+  buildJsaCrewGrid();
+  buildJsaSteps();
+  initJsaCanvas();
   loadJobs();
   document.getElementById('apprenticeCard').classList.add('hidden');
 }
@@ -797,6 +927,7 @@ async function loadJobs() {
     const opts = '<option value="">Select job…</option>' + jobs.map(j => `<option value="${j}">${j}</option>`).join('');
     document.getElementById('jobSelect').innerHTML = opts;
     document.getElementById('punchJobSelect').innerHTML = opts;
+    document.getElementById('jsaJobSelect').innerHTML = opts;
   } catch (e) {
     document.getElementById('jobSelect').innerHTML = '<option value="">Could not load jobs — check connection</option>';
   }
@@ -806,9 +937,11 @@ async function loadJobs() {
    TABS
    ============================================================ */
 function showTab(tab) {
+  document.getElementById('tab-morning').classList.toggle('hidden', tab !== 'morning');
   document.getElementById('tab-crew').classList.toggle('hidden', tab !== 'crew');
   document.getElementById('tab-sup').classList.toggle('hidden', tab !== 'sup');
   document.getElementById('tab-punch').classList.toggle('hidden', tab !== 'punch');
+  document.getElementById('tabBtnMorning').classList.toggle('active', tab === 'morning');
   document.getElementById('tabBtnCrew').classList.toggle('active', tab === 'crew');
   document.getElementById('tabBtnSup').classList.toggle('active', tab === 'sup');
   document.getElementById('tabBtnPunch').classList.toggle('active', tab === 'punch');
@@ -1228,6 +1361,155 @@ async function submitSignoff() {
   } catch (e) {
     showToast('Could not sign off', true);
   }
+}
+
+/* ============================================================
+   MORNING JSA / SWMS
+   ============================================================ */
+function buildJsaPpe() {
+  document.getElementById('jsaPpeList').innerHTML = JSA_PPE.map(p => `<span class="ppe-chip">${p}</span>`).join('');
+}
+
+function buildJsaSteps() {
+  buildJsaPpe();
+  const container = document.getElementById('jsaStepsList');
+  container.innerHTML = JSA_STEPS.map((s, i) => `
+    <div class="jsa-step">
+      <div class="jsa-step-title">${i + 1}. ${s.title}</div>
+      <div class="jsa-col"><b class="hz">⚠ Hazards</b><ul>${s.hazards.map(h => `<li>${h}</li>`).join('')}</ul></div>
+      <div class="jsa-col"><b class="ctl">✔ Controls</b><ul>${s.controls.map(c => `<li>${c}</li>`).join('')}</ul></div>
+    </div>`).join('');
+}
+
+function buildJsaCrewGrid() {
+  const grid = document.getElementById('jsaCrewGrid');
+  grid.innerHTML = "";
+  Object.keys(CREW).forEach(group => {
+    const label = document.createElement('div');
+    label.className = 'role-label';
+    label.textContent = group;
+    grid.appendChild(label);
+    const wrap = document.createElement('div');
+    wrap.className = 'name-grid';
+    CREW[group].forEach(person => {
+      const btn = document.createElement('button');
+      btn.className = 'pill jsa-crew-pill';
+      btn.textContent = person.name;
+      btn.type = 'button';
+      btn.dataset.name = person.name;
+      btn.onclick = () => openJsaSign(person.name, person.role, btn);
+      wrap.appendChild(btn);
+    });
+    grid.appendChild(wrap);
+  });
+}
+
+function openJsaSign(name, role, btnEl) {
+  jsaState.currentWorker = { name, role };
+  document.getElementById('jsaSignName').textContent = name;
+  document.getElementById('jsaSignPad').classList.remove('hidden');
+  document.querySelectorAll('#jsaCrewGrid .pill').forEach(b => b.classList.remove('active-signing'));
+  btnEl.classList.add('active-signing');
+  clearJsaCanvas();
+  sizeJsaCanvas();
+  document.getElementById('jsaSignPad').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function initJsaCanvas() {
+  const canvas = document.getElementById('jsaCanvas');
+  canvas.addEventListener('pointerdown', (e) => {
+    jsaDrawing = true;
+    jsaLastPoint = { x: e.offsetX, y: e.offsetY };
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!jsaDrawing) return;
+    const ctx = canvas.getContext('2d');
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(jsaLastPoint.x, jsaLastPoint.y);
+    ctx.lineTo(e.offsetX, e.offsetY);
+    ctx.stroke();
+    jsaLastPoint = { x: e.offsetX, y: e.offsetY };
+    jsaHasSignature = true;
+  });
+  canvas.addEventListener('pointerup', () => { jsaDrawing = false; });
+  canvas.addEventListener('pointerleave', () => { jsaDrawing = false; });
+  window.addEventListener('resize', () => {
+    if (!document.getElementById('jsaSignPad').classList.contains('hidden')) sizeJsaCanvas();
+  });
+}
+
+function sizeJsaCanvas() {
+  const canvas = document.getElementById('jsaCanvas');
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight || 160;
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+}
+
+function clearJsaCanvas() {
+  const canvas = document.getElementById('jsaCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  jsaHasSignature = false;
+}
+
+function saveJsaSignature() {
+  if (!jsaHasSignature) return alert('Please draw a signature first.');
+  const canvas = document.getElementById('jsaCanvas');
+  const dataUrl = canvas.toDataURL('image/png');
+  const { name, role } = jsaState.currentWorker;
+  jsaState.signed[name] = { role, dataUrl };
+  const pillBtn = [...document.querySelectorAll('#jsaCrewGrid .pill')].find(b => b.dataset.name === name);
+  if (pillBtn) { pillBtn.classList.add('signed'); pillBtn.classList.remove('active-signing'); }
+  document.getElementById('jsaSignPad').classList.add('hidden');
+  showToast(name + ' signed');
+}
+
+async function submitJsaSignon() {
+  const job = document.getElementById('jsaJobSelect').value;
+  if (!job) return alert('Select a job.');
+  const workers = Object.keys(jsaState.signed);
+  if (!workers.length) return alert('At least one crew member needs to sign the JSA.');
+
+  const payload = {
+    action: 'jsa_signon',
+    job,
+    workers: workers.map(name => ({ name, role: jsaState.signed[name].role, signature: jsaState.signed[name].dataUrl }))
+  };
+
+  const btn = document.getElementById('jsaSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  try {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    });
+    showToast('Morning JSA signed on — ' + workers.length + ' worker(s)');
+    resetJsaForm();
+  } catch (e) {
+    showToast('Could not submit JSA sign-on', true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Submit morning JSA sign-on';
+  }
+}
+
+function resetJsaForm() {
+  jsaState.signed = {};
+  jsaState.currentWorker = null;
+  document.querySelectorAll('#jsaCrewGrid .pill').forEach(b => b.classList.remove('signed', 'active-signing'));
+  document.getElementById('jsaSignPad').classList.add('hidden');
+  document.getElementById('jsaJobSelect').value = '';
+  clearJsaCanvas();
+  window.scrollTo(0, 0);
 }
 
 init();
