@@ -206,7 +206,11 @@
     font-weight: 700;
     font-size: 15px;
   }
-  .rating-buttons button.selected { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .rating-buttons button.rate-1.selected { background: #c0392b; border-color: #c0392b; color: #fff; }
+  .rating-buttons button.rate-2.selected { background: #e0703c; border-color: #e0703c; color: #fff; }
+  .rating-buttons button.rate-3.selected { background: #e8b923; border-color: #e8b923; color: #1a1a1a; }
+  .rating-buttons button.rate-4.selected { background: #8fb339; border-color: #8fb339; color: #fff; }
+  .rating-buttons button.rate-5.selected { background: #2e7d32; border-color: #2e7d32; color: #fff; }
   .kpi-comment { margin-top: 8px; min-height: 60px; }
   .kpi-total-box {
     background: #fff8dc;
@@ -582,23 +586,28 @@ const STAGES = [
 // pick this up automatically. "options" is ['Yes','No'] or
 // ['Yes','No','N/A']. "noteWhen" lists which answer(s) should pop
 // open a required (or optional) note box.
+// "goodAnswers" lists which answer(s) count as a good/on-track outcome for
+// that question — those render green. Anything else renders red. N/A always
+// renders green (nothing to worry about). This lets each question's colours
+// reflect what's actually good news vs. what needs attention, rather than
+// Yes always being green and No always being red.
 const DAILY_CHECKLIST = [
-  { id: 'tasksCompleted', label: 'Were all scheduled Tradify tasks completed today?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: "What's still outstanding?", noteRequired: true },
-  { id: 'scheduleImpact', label: 'Is there anything that will affect the current schedule or timeline?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'What, and how?', noteRequired: true },
-  { id: 'photosTaken', label: 'Were all required photos taken today?', options: ['Yes','No','N/A'], noteWhen: [], noteRequired: false },
-  { id: 'photosUploaded', label: 'Were all required progress photos uploaded to Tradify?', options: ['Yes','No','N/A'], noteWhen: [], noteRequired: false },
-  { id: 'timesheetsComplete', label: 'Are your Tradify timesheets complete and accurate?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: 'What needs fixing?', noteRequired: false },
-  { id: 'clientHappy', label: "Is the client happy with today's progress?", options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: "What's the issue?", noteRequired: true },
-  { id: 'officeAction', label: 'Is there anything the office needs to action before tomorrow?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'What do they need to do?', noteRequired: true },
-  { id: 'materialsToOrder', label: 'Are there any materials that need to be ordered?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: "What's needed?", noteRequired: true },
-  { id: 'readyTomorrow', label: "Do you have everything required for tomorrow's work?", options: ['Yes','No'], noteWhen: ['No'], notePrompt: "What's missing?", noteRequired: true },
-  { id: 'safetyIncident', label: 'Were there any safety incidents, hazards or near misses today?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'Please describe what happened', noteRequired: true, important: true },
-  { id: 'qualityIssue', label: 'Were any defects, damage or quality issues identified today?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'Please describe', noteRequired: true },
-  { id: 'siteClean', label: 'Has the job site been left clean and tidy?', options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: 'Why not?', noteRequired: true },
-  { id: 'toolsPacked', label: 'Tools packed', options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: 'Why not?', noteRequired: true },
-  { id: 'plantSecured', label: 'Plant / equipment secured', options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: 'Why not?', noteRequired: true },
-  { id: 'wasteSorted', label: 'Has all rubbish been removed or properly stored?', options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: 'Why not?', noteRequired: true },
-  { id: 'goodDay', label: 'Did you have a good day?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: 'What happened?', noteRequired: true, celebrateWhen: ['Yes'], celebrateEmoji: '😄' }
+  { id: 'tasksCompleted', label: 'Were all scheduled Tradify tasks completed today?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: "What's still outstanding?", noteRequired: true, goodAnswers: ['Yes'] },
+  { id: 'scheduleImpact', label: 'Is there anything that will affect the current schedule or timeline?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'What, and how?', noteRequired: true, goodAnswers: ['No'] },
+  { id: 'photosTaken', label: 'Were all required photos taken today?', options: ['Yes','No','N/A'], noteWhen: [], noteRequired: false, goodAnswers: ['Yes'] },
+  { id: 'photosUploaded', label: 'Were all required progress photos uploaded to Tradify?', options: ['Yes','No','N/A'], noteWhen: [], noteRequired: false, goodAnswers: ['Yes'] },
+  { id: 'timesheetsComplete', label: 'Are your Tradify timesheets complete and accurate?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: 'What needs fixing?', noteRequired: false, goodAnswers: ['Yes'] },
+  { id: 'clientHappy', label: "Is the client happy with today's progress?", options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: "What's the issue?", noteRequired: true, goodAnswers: ['Yes'] },
+  { id: 'officeAction', label: 'Is there anything the office needs to action before tomorrow?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'What do they need to do?', noteRequired: true, goodAnswers: ['No'] },
+  { id: 'materialsToOrder', label: 'Are there any materials that need to be ordered?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: "What's needed?", noteRequired: true, goodAnswers: ['No'] },
+  { id: 'readyTomorrow', label: "Do you have everything required for tomorrow's work?", options: ['Yes','No'], noteWhen: ['No'], notePrompt: "What's missing?", noteRequired: true, goodAnswers: ['Yes'] },
+  { id: 'safetyIncident', label: 'Were there any safety incidents, hazards or near misses today?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'Please describe what happened', noteRequired: true, important: true, goodAnswers: ['No'] },
+  { id: 'qualityIssue', label: 'Were any defects, damage or quality issues identified today?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'Please describe', noteRequired: true, goodAnswers: ['No'] },
+  { id: 'siteClean', label: 'Has the job site been left clean and tidy?', options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: 'Why not?', noteRequired: true, goodAnswers: ['Yes'] },
+  { id: 'toolsPacked', label: 'Tools packed', options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: 'Why not?', noteRequired: true, goodAnswers: ['Yes'] },
+  { id: 'plantSecured', label: 'Plant / equipment secured', options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: 'Why not?', noteRequired: true, goodAnswers: ['Yes'] },
+  { id: 'wasteSorted', label: 'Has all rubbish been removed or properly stored?', options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: 'Why not?', noteRequired: true, goodAnswers: ['Yes'] },
+  { id: 'goodDay', label: 'Did you have a good day?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: 'What happened?', noteRequired: true, celebrateWhen: ['Yes'], celebrateEmoji: '😄', goodAnswers: ['Yes'] }
 ];
 
 // Weekly Crew Leader KPI Scorecard (supervisors only, once per week).
@@ -906,8 +915,12 @@ function buildDailyChecklist() {
   const container = document.getElementById('dailyChecklist');
   container.innerHTML = DAILY_CHECKLIST.map(q => {
     const buttons = q.options.map(opt => {
-      const cls = opt === 'Yes' ? 'sel-yes' : (opt === 'No' ? 'sel-no' : 'sel-na');
-      return `<button class="${cls}" onclick="setDaily('${q.id}','${opt}')">${opt}</button>`;
+      // Colour reflects whether this answer is good news (green) or needs
+      // attention (red) for THIS question — not a fixed Yes=green/No=red.
+      // N/A always renders green.
+      const isGood = opt === 'N/A' || (q.goodAnswers || []).includes(opt);
+      const cls = isGood ? 'sel-yes' : 'sel-no';
+      return `<button class="${cls}" data-opt="${opt}" onclick="setDaily('${q.id}','${opt}')">${opt}</button>`;
     }).join('');
     return `
       <div class="gear-item${q.important ? ' important' : ''}" id="daily-${q.id}">
@@ -966,8 +979,8 @@ function setDaily(id, value) {
   dailyState[id] = value;
   const container = document.querySelector(`#daily-${id} .yesno`);
   container.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
-  const cls = value === 'Yes' ? '.sel-yes' : (value === 'No' ? '.sel-no' : '.sel-na');
-  container.querySelector(cls).classList.add('selected');
+  const btn = [...container.querySelectorAll('button')].find(b => b.dataset.opt === value);
+  if (btn) btn.classList.add('selected');
 
   const q = DAILY_CHECKLIST.find(q => q.id === id);
   const noteBox = document.getElementById('daily-' + id).querySelector('.note-box');
@@ -1116,7 +1129,7 @@ function buildWeeklyKpi() {
   const container = document.getElementById('weeklyKpiList');
   container.innerHTML = WEEKLY_KPI.map(k => {
     const buttons = [1, 2, 3, 4, 5].map(n =>
-      `<button onclick="setKpiRating('${k.id}',${n})" id="kpi-${k.id}-${n}">${n}</button>`
+      `<button class="rate-${n}" onclick="setKpiRating('${k.id}',${n})" id="kpi-${k.id}-${n}">${n}</button>`
     ).join('');
     const desc = KPI_DESCRIPTIONS[k.id];
     const descHtml = desc
