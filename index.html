@@ -174,6 +174,30 @@
     100% { transform: scale(1); }
   }
 
+  .kpi-item { margin-bottom: 16px; }
+  .kpi-item:last-child { margin-bottom: 0; }
+  .rating-buttons { display: flex; gap: 6px; margin-top: 6px; }
+  .rating-buttons button {
+    flex: 1;
+    padding: 10px 0;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    background: #fff;
+    font-weight: 700;
+    font-size: 15px;
+  }
+  .rating-buttons button.selected { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .kpi-comment { margin-top: 8px; min-height: 60px; }
+  .kpi-total-box {
+    background: #fff8dc;
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    padding: 12px;
+    margin: 16px 0;
+    font-size: 15px;
+    text-align: center;
+  }
+
   .btn-primary {
     width: 100%;
     padding: 16px;
@@ -351,6 +375,48 @@
         <h2>Flags raised today</h2>
         <div id="dashFlags"><p class="helper">Loading…</p></div>
       </div>
+
+      <div class="card" id="weeklyKpiSection">
+        <h2>Weekly Crew Leader KPI Scorecard</h2>
+        <div class="card-sub">Supervisors only — complete once per week</div>
+
+        <label>Crew leader</label>
+        <select id="kpiCrewLeader"><option value="">Select…</option></select>
+
+        <label>Week of</label>
+        <input type="date" id="kpiWeekStart">
+        <label>To</label>
+        <input type="date" id="kpiWeekEnd">
+
+        <div id="weeklyKpiList"></div>
+
+        <div class="kpi-total-box" id="kpiTotalBox">Total score: 0 / 45</div>
+
+        <label>Are everyone's hours done and correct to the best of your ability?</label>
+        <div class="yesno" data-field="hoursCorrect">
+          <button class="sel-yes" onclick="setWeeklyCheck('hoursCorrect','Yes')">Yes</button>
+          <button class="sel-no" onclick="setWeeklyCheck('hoursCorrect','No')">No</button>
+        </div>
+
+        <label>Are all receipts uploaded correctly with the job number (JN)?</label>
+        <div class="yesno" data-field="receiptsUploaded">
+          <button class="sel-yes" onclick="setWeeklyCheck('receiptsUploaded','Yes')">Yes</button>
+          <button class="sel-no" onclick="setWeeklyCheck('receiptsUploaded','No')">No</button>
+        </div>
+
+        <label>Biggest win this week</label>
+        <textarea id="kpiBiggestWin"></textarea>
+        <label>Biggest challenge this week</label>
+        <textarea id="kpiBiggestChallenge"></textarea>
+        <label>Areas for improvement</label>
+        <textarea id="kpiAreasImprovement"></textarea>
+        <label>Goals for next week</label>
+        <textarea id="kpiGoalsNextWeek"></textarea>
+        <label>How can the office better support you?</label>
+        <textarea id="kpiOfficeSupport"></textarea>
+
+        <button class="btn-primary" onclick="submitWeeklyKpi()">Submit weekly KPI</button>
+      </div>
     </div>
   </div>
 
@@ -452,6 +518,30 @@ const DAILY_CHECKLIST = [
   { id: 'goodDay', label: 'Did you have a good day?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: 'What happened?', noteRequired: true, celebrateWhen: ['Yes'], celebrateEmoji: '😄' }
 ];
 
+// Weekly Crew Leader KPI Scorecard (supervisors only, once per week).
+// Each KPI is rated 1-5. Add/remove/reorder items here — the form
+// and the total-score calculation both pick this up automatically.
+const WEEKLY_KPI = [
+  { id: 'safety', label: 'Safety' },
+  { id: 'productivity', label: 'Productivity' },
+  { id: 'quality', label: 'Quality' },
+  { id: 'leadership', label: 'Leadership' },
+  { id: 'communication', label: 'Communication' },
+  { id: 'companyStandards', label: 'Company standards' },
+  { id: 'ownershipInitiative', label: 'Ownership & initiative' },
+  { id: 'callBacksDefects', label: 'Call backs for defects' },
+  { id: 'unnecessaryCalls', label: 'Un-necessary calls' }
+];
+
+// Score bands out of 45 (9 KPIs x 5) -> weekly performance rating + bonus.
+const KPI_TIERS = [
+  { min: 40, max: 45, label: 'Outstanding week', bonus: 100 },
+  { min: 34, max: 39, label: 'Exceeded expectations', bonus: 75 },
+  { min: 28, max: 33, label: 'Met expectations', bonus: 25 },
+  { min: 21, max: 27, label: 'Improvement required', bonus: 0 },
+  { min: 0, max: 20, label: 'Performance improvement plan required', bonus: 0 }
+];
+
 /* ============================================================
    STATE
    ============================================================ */
@@ -459,6 +549,9 @@ let selectedName = null;
 let selectedRole = null;
 let dailyState = {};
 DAILY_CHECKLIST.forEach(q => dailyState[q.id] = null);
+let kpiState = {};
+WEEKLY_KPI.forEach(k => kpiState[k.id] = null);
+let weeklyCheckState = { hoursCorrect: null, receiptsUploaded: null };
 let pinBuffer = "";
 
 /* ============================================================
@@ -468,6 +561,9 @@ function init() {
   buildNameGrid();
   buildStageSelects();
   buildDailyChecklist();
+  buildWeeklyKpiCrewSelect();
+  buildWeeklyKpi();
+  setWeekDefaults();
   loadJobs();
   document.getElementById('apprenticeCard').classList.add('hidden');
 }
@@ -705,6 +801,131 @@ function showToast(msg, isError) {
   t.textContent = msg;
   t.className = 'toast show' + (isError ? ' error' : '');
   setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+/* ============================================================
+   WEEKLY KPI SCORECARD (supervisors only)
+   ============================================================ */
+function buildWeeklyKpiCrewSelect() {
+  const sel = document.getElementById('kpiCrewLeader');
+  const supervisors = CREW['Supervisors'] || [];
+  sel.innerHTML = '<option value="">Select…</option>' +
+    supervisors.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+}
+
+function buildWeeklyKpi() {
+  const container = document.getElementById('weeklyKpiList');
+  container.innerHTML = WEEKLY_KPI.map(k => {
+    const buttons = [1, 2, 3, 4, 5].map(n =>
+      `<button onclick="setKpiRating('${k.id}',${n})" id="kpi-${k.id}-${n}">${n}</button>`
+    ).join('');
+    return `
+      <div class="kpi-item">
+        <label>${k.label}</label>
+        <div class="rating-buttons" data-field="${k.id}">${buttons}</div>
+        <textarea class="kpi-comment" placeholder="Comments (optional)" id="kpiNote-${k.id}"></textarea>
+      </div>`;
+  }).join('');
+}
+
+function setKpiRating(id, value) {
+  kpiState[id] = value;
+  const group = document.querySelector(`.rating-buttons[data-field="${id}"]`);
+  group.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+  document.getElementById(`kpi-${id}-${value}`).classList.add('selected');
+  updateKpiTotal();
+}
+
+function updateKpiTotal() {
+  const answered = WEEKLY_KPI.map(k => kpiState[k.id]).filter(v => v !== null);
+  const total = answered.reduce((a, b) => a + b, 0);
+  const box = document.getElementById('kpiTotalBox');
+  if (answered.length < WEEKLY_KPI.length) {
+    box.innerHTML = `<b>Total score:</b> ${total} / 45 — rate all ${WEEKLY_KPI.length} KPIs to see the result`;
+    return;
+  }
+  const tier = KPI_TIERS.find(t => total >= t.min && total <= t.max);
+  box.innerHTML = `<b>Total score:</b> ${total} / 45<br><b>${tier.label}</b> — Bonus: $${tier.bonus}`;
+}
+
+function setWeeklyCheck(field, value) {
+  weeklyCheckState[field] = value;
+  const container = document.querySelector(`.yesno[data-field="${field}"]`);
+  container.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+  if (value === 'Yes') container.querySelector('.sel-yes').classList.add('selected');
+  if (value === 'No') container.querySelector('.sel-no').classList.add('selected');
+}
+
+function setWeekDefaults() {
+  const now = new Date();
+  const day = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + (day === 0 ? -6 : 1 - day));
+  const friday = new Date(monday);
+  friday.setDate(monday.getDate() + 4);
+  const fmt = d => d.toISOString().slice(0, 10);
+  document.getElementById('kpiWeekStart').value = fmt(monday);
+  document.getElementById('kpiWeekEnd').value = fmt(friday);
+}
+
+async function submitWeeklyKpi() {
+  const crewLeader = document.getElementById('kpiCrewLeader').value;
+  if (!crewLeader) return alert('Select a crew leader.');
+  const weekStart = document.getElementById('kpiWeekStart').value;
+  const weekEnd = document.getElementById('kpiWeekEnd').value;
+  if (!weekStart || !weekEnd) return alert("Please set the week's start and end dates.");
+
+  for (const k of WEEKLY_KPI) {
+    if (!kpiState[k.id]) return alert('Please rate: ' + k.label);
+  }
+  if (!weeklyCheckState.hoursCorrect) return alert("Please answer: Are everyone's hours done and correct?");
+  if (!weeklyCheckState.receiptsUploaded) return alert('Please answer: Are all receipts uploaded correctly with the job number (JN)?');
+
+  const total = WEEKLY_KPI.reduce((sum, k) => sum + kpiState[k.id], 0);
+  const tier = KPI_TIERS.find(t => total >= t.min && total <= t.max);
+
+  const payload = { action: 'weekly_kpi', crewLeader, weekStart, weekEnd };
+  WEEKLY_KPI.forEach(k => {
+    payload[k.id] = kpiState[k.id];
+    const noteEl = document.getElementById('kpiNote-' + k.id);
+    payload[k.id + 'Note'] = noteEl ? noteEl.value.trim() : '';
+  });
+  payload.totalScore = total;
+  payload.performanceRating = tier.label;
+  payload.bonusEarned = tier.bonus;
+  payload.biggestWin = document.getElementById('kpiBiggestWin').value.trim();
+  payload.biggestChallenge = document.getElementById('kpiBiggestChallenge').value.trim();
+  payload.areasImprovement = document.getElementById('kpiAreasImprovement').value.trim();
+  payload.goalsNextWeek = document.getElementById('kpiGoalsNextWeek').value.trim();
+  payload.officeSupport = document.getElementById('kpiOfficeSupport').value.trim();
+  payload.hoursCorrect = weeklyCheckState.hoursCorrect;
+  payload.receiptsUploaded = weeklyCheckState.receiptsUploaded;
+
+  try {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    });
+    showToast('Weekly KPI submitted');
+    resetWeeklyKpiForm();
+  } catch (e) {
+    showToast('Could not submit weekly KPI', true);
+  }
+}
+
+function resetWeeklyKpiForm() {
+  WEEKLY_KPI.forEach(k => kpiState[k.id] = null);
+  weeklyCheckState = { hoursCorrect: null, receiptsUploaded: null };
+  document.getElementById('kpiCrewLeader').value = '';
+  setWeekDefaults();
+  document.querySelectorAll('#weeklyKpiSection .rating-buttons button').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.kpi-comment').forEach(t => t.value = '');
+  document.getElementById('kpiTotalBox').innerHTML = 'Total score: 0 / 45';
+  document.querySelectorAll('#weeklyKpiSection .yesno button').forEach(b => b.classList.remove('selected'));
+  ['kpiBiggestWin', 'kpiBiggestChallenge', 'kpiAreasImprovement', 'kpiGoalsNextWeek', 'kpiOfficeSupport'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
 }
 
 /* ============================================================
