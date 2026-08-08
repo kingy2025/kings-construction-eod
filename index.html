@@ -174,8 +174,23 @@
     100% { transform: scale(1); }
   }
 
+  .week-row { display: flex; align-items: center; gap: 10px; }
+  .week-row input { flex: 1; }
+  .week-row span { font-weight: 600; color: var(--muted); }
+
   .kpi-item { margin-bottom: 16px; }
   .kpi-item:last-child { margin-bottom: 0; }
+  .kpi-label { cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .kpi-label .info-icon { font-size: 12px; font-weight: 600; color: var(--brand); white-space: nowrap; }
+  .kpi-desc { display: none; background: #f2f4f7; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 13px; }
+  .kpi-desc.show { display: block; }
+  .kpi-desc .kpi-desc-summary { color: var(--muted); font-style: italic; margin-bottom: 10px; }
+  .kpi-desc-col { margin-bottom: 10px; }
+  .kpi-desc-col:last-child { margin-bottom: 0; }
+  .kpi-desc-col.excellent b { color: var(--ok); }
+  .kpi-desc-col.poor b { color: var(--danger); }
+  .kpi-desc ul { margin: 4px 0 0 18px; padding: 0; }
+  .kpi-desc li { margin-bottom: 3px; }
   .rating-buttons { display: flex; gap: 6px; margin-top: 6px; }
   .rating-buttons button {
     flex: 1;
@@ -384,9 +399,11 @@
         <select id="kpiCrewLeader"><option value="">Select…</option></select>
 
         <label>Week of</label>
-        <input type="date" id="kpiWeekStart">
-        <label>To</label>
-        <input type="date" id="kpiWeekEnd">
+        <div class="week-row">
+          <input type="date" id="kpiWeekStart">
+          <span>to</span>
+          <input type="date" id="kpiWeekEnd">
+        </div>
 
         <div id="weeklyKpiList"></div>
 
@@ -531,6 +548,155 @@ const WEEKLY_KPI = [
   { id: 'ownershipInitiative', label: 'Ownership & initiative' },
   { id: 'callBacksDefects', label: 'Call backs for defects' },
   { id: 'unnecessaryCalls', label: 'Un-necessary calls' }
+];
+
+// Per-KPI "what does this mean" descriptions, from the Crew Leader
+// Expectations sheet (excellent vs poor performance examples).
+// Any KPI id not listed here falls back to the generic 1-5 rating guide.
+const KPI_DESCRIPTIONS = {
+  safety: {
+    summary: 'Protect yourself, your team and others. Safety is always our #1 priority.',
+    excellent: [
+      'Leads by example and promotes a strong safety culture.',
+      'Crew consistently follows SWMS and PPE requirements.',
+      'Site is clean, organised and hazard free.',
+      'Hazards are identified and addressed immediately.',
+      'Incidents and near misses reported promptly.',
+      'No preventable safety incidents.'
+    ],
+    poor: [
+      'Unsafe work practices.',
+      'Site left untidy or hazardous.',
+      'SWMS or PPE not followed.',
+      'Hazards ignored or left unresolved.',
+      'Safety shortcuts taken to save time.',
+      'Preventable incidents occur.'
+    ]
+  },
+  productivity: {
+    summary: 'Work efficiently, manage time well and keep projects moving forward.',
+    excellent: [
+      'Meets or exceeds the weekly programme.',
+      'Crew remains productive throughout the day.',
+      'Materials are organised before they are required.',
+      'Trades are coordinated efficiently.',
+      'Minimal downtime or waiting.',
+      'Thinks ahead and keeps the project moving.'
+    ],
+    poor: [
+      'Delays caused by poor planning.',
+      'Crew regularly waiting for instructions or materials.',
+      'Missed programme milestones.',
+      'Poor coordination of subcontractors.',
+      'Frequent downtime.',
+      'Reactive instead of proactive.'
+    ]
+  },
+  quality: {
+    summary: 'Deliver high quality workmanship that we are proud to put our name to.',
+    excellent: [
+      'High quality workmanship every day.',
+      'No client complaints.',
+      'Minimal defects or rework.',
+      'Finished work protected from damage.',
+      'Pride taken in presentation.',
+      'Consistently delivers the Kings Construction standard.'
+    ],
+    poor: [
+      'Multiple defects.',
+      'Avoidable rework.',
+      'Poor attention to detail.',
+      'Client complaints.',
+      'Finished work damaged through poor care.',
+      'Work below Kings Construction standards.'
+    ]
+  },
+  leadership: {
+    summary: 'Lead your team with respect, set the tone and get the best out of everyone.',
+    excellent: [
+      'Leads by example.',
+      'Apprentice is learning and improving.',
+      'Delegates work effectively.',
+      'Crew knows the daily plan.',
+      'Positive attitude and culture on site.',
+      'Holds the team accountable.'
+    ],
+    poor: [
+      'Apprentice receives little guidance.',
+      'Poor leadership or attitude.',
+      'Crew lacks direction.',
+      'Avoids difficult conversations.',
+      "Doesn't hold the team accountable.",
+      'Reactive leadership.'
+    ]
+  },
+  communication: {
+    summary: 'Communicate clearly with your team, clients and the office.',
+    excellent: [
+      'Makes informed decisions within their authority.',
+      'Solves problems before contacting the office.',
+      'Tradify updated with progress photos and notes.',
+      'Variations and site issues recorded promptly.',
+      'Professional communication with clients, suppliers and subcontractors.',
+      'Escalates issues early with recommended solutions.'
+    ],
+    poor: [
+      'Constant reliance on the office.',
+      'Tradify not maintained.',
+      'Poor communication with clients or trades.',
+      'Variations not documented.',
+      'Problems communicated too late.',
+      'Creates confusion or delays through poor communication.'
+    ]
+  },
+  companyStandards: {
+    summary: 'Represent Kings Construction with pride and follow company processes.',
+    excellent: [
+      'All paperwork uploaded to Hubdoc every Friday.',
+      'Timesheets submitted on time.',
+      'Tradify maintained throughout the project.',
+      'Materials organised ahead of schedule.',
+      'Site presented professionally.',
+      'Represents Kings Construction with pride.'
+    ],
+    poor: [
+      'Missing or late paperwork.',
+      'Late timesheets.',
+      'Tradify incomplete or not updated.',
+      'Materials not organised.',
+      'Untidy worksite.',
+      'Poor representation of the company.'
+    ]
+  },
+  ownershipInitiative: {
+    summary: 'Take ownership, think ahead and find a better way.',
+    excellent: [
+      'Takes ownership of every project.',
+      'Solves problems independently.',
+      'Protects company profit.',
+      'Looks for ways to improve systems.',
+      'Supports the team.',
+      "Makes the office's job easier."
+    ],
+    poor: [
+      'Waits to be told what to do.',
+      'Passes problems onto others.',
+      'Avoids responsibility.',
+      'Repeats the same mistakes.',
+      "Doesn't look for improvements.",
+      'Creates unnecessary work for the office.'
+    ]
+  }
+};
+
+// Generic 1-5 rating guide (fallback for any KPI without a specific
+// excellent/poor description above, e.g. Call backs / Un-necessary calls).
+const KPI_RATING_GUIDE = [
+  { score: 5, text: 'Consistently exceeds expectations. Demonstrates leadership, ownership and requires minimal support from the office.' },
+  { score: 4, text: 'Consistently performs to the expected Kings Construction standard.' },
+  { score: 3, text: 'Meets the minimum standard but improvement is required in one or more areas.' },
+  { score: 2, text: 'Performance is below expectations and requires regular coaching and improvement.' },
+  { score: 1, text: 'Unsatisfactory performance requiring immediate improvement.' }
 ];
 
 // Score bands out of 45 (9 KPIs x 5) -> weekly performance rating + bonus.
@@ -819,13 +985,24 @@ function buildWeeklyKpi() {
     const buttons = [1, 2, 3, 4, 5].map(n =>
       `<button onclick="setKpiRating('${k.id}',${n})" id="kpi-${k.id}-${n}">${n}</button>`
     ).join('');
+    const desc = KPI_DESCRIPTIONS[k.id];
+    const descHtml = desc
+      ? `<div class="kpi-desc-summary">${desc.summary}</div>
+         <div class="kpi-desc-col excellent"><b>✔ Excellent performance</b><ul>${desc.excellent.map(x => `<li>${x}</li>`).join('')}</ul></div>
+         <div class="kpi-desc-col poor"><b>✘ Poor performance</b><ul>${desc.poor.map(x => `<li>${x}</li>`).join('')}</ul></div>`
+      : KPI_RATING_GUIDE.map(g => `<div><b>${g.score}</b> — ${g.text}</div>`).join('');
     return `
       <div class="kpi-item">
-        <label>${k.label}</label>
+        <label class="kpi-label" onclick="toggleKpiDesc('${k.id}')">${k.label} <span class="info-icon">What does this mean? ⓘ</span></label>
+        <div class="kpi-desc" id="kpiDesc-${k.id}">${descHtml}</div>
         <div class="rating-buttons" data-field="${k.id}">${buttons}</div>
         <textarea class="kpi-comment" placeholder="Comments (optional)" id="kpiNote-${k.id}"></textarea>
       </div>`;
   }).join('');
+}
+
+function toggleKpiDesc(id) {
+  document.getElementById('kpiDesc-' + id).classList.toggle('show');
 }
 
 function setKpiRating(id, value) {
@@ -921,6 +1098,7 @@ function resetWeeklyKpiForm() {
   setWeekDefaults();
   document.querySelectorAll('#weeklyKpiSection .rating-buttons button').forEach(b => b.classList.remove('selected'));
   document.querySelectorAll('.kpi-comment').forEach(t => t.value = '');
+  document.querySelectorAll('.kpi-desc').forEach(d => d.classList.remove('show'));
   document.getElementById('kpiTotalBox').innerHTML = 'Total score: 0 / 45';
   document.querySelectorAll('#weeklyKpiSection .yesno button').forEach(b => b.classList.remove('selected'));
   ['kpiBiggestWin', 'kpiBiggestChallenge', 'kpiAreasImprovement', 'kpiGoalsNextWeek', 'kpiOfficeSupport'].forEach(id => {
