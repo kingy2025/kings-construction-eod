@@ -369,7 +369,7 @@
 
     <div class="card">
       <h2>On site</h2>
-      <label>Your name</label>
+      <label>Who's signing off? (select everyone who worked this job today)</label>
       <div id="nameGrid"></div>
 
       <label>Job</label>
@@ -843,8 +843,7 @@ const JSA_STEPS = [
 /* ============================================================
    STATE
    ============================================================ */
-let selectedName = null;
-let selectedRole = null;
+let selectedNames = [];
 let dailyState = {};
 DAILY_CHECKLIST.forEach(q => dailyState[q.id] = null);
 let kpiState = {};
@@ -895,19 +894,23 @@ function buildNameGrid() {
       btn.className = 'pill';
       btn.textContent = person.name;
       btn.type = 'button';
-      btn.onclick = () => selectName(person.name, person.role, btn);
+      btn.onclick = () => toggleName(person.name, person.role, btn);
       wrap.appendChild(btn);
     });
     grid.appendChild(wrap);
   });
 }
 
-function selectName(name, role, btnEl) {
-  selectedName = name;
-  selectedRole = role;
-  document.querySelectorAll('#nameGrid .pill').forEach(b => b.classList.remove('selected'));
-  btnEl.classList.add('selected');
-  document.getElementById('apprenticeCard').classList.toggle('hidden', role !== 'Apprentice');
+function toggleName(name, role, btnEl) {
+  const idx = selectedNames.findIndex(p => p.name === name);
+  if (idx >= 0) {
+    selectedNames.splice(idx, 1);
+    btnEl.classList.remove('selected');
+  } else {
+    selectedNames.push({ name, role });
+    btnEl.classList.add('selected');
+  }
+  document.getElementById('apprenticeCard').classList.toggle('hidden', !selectedNames.some(p => p.role === 'Apprentice'));
 }
 
 function buildStageSelects() {
@@ -1003,7 +1006,7 @@ function setDaily(id, value) {
    SUBMIT EOD
    ============================================================ */
 async function submitEod() {
-  if (!selectedName) return alert('Please select your name.');
+  if (!selectedNames.length) return alert('Please select who is signing off.');
   const job = document.getElementById('jobSelect').value;
   if (!job) return alert('Please select a job.');
   const jobUpdate = document.getElementById('jobUpdate').value.trim();
@@ -1025,8 +1028,8 @@ async function submitEod() {
   // Map to the specific field names Code.gs expects
   const payload = {
     action: 'eod',
-    name: selectedName,
-    role: selectedRole,
+    name: selectedNames.map(p => p.name).join(', '),
+    role: [...new Set(selectedNames.map(p => p.role))].join(', '),
     job: job,
     jobUpdate: jobUpdate,
     flagDamage: document.getElementById('chkDamage').checked,
@@ -1047,7 +1050,7 @@ async function submitEod() {
     wasteSorted: dailyPayload.wasteSorted,
     wasteSortedNote: dailyPayload.wasteSortedNote,
     otherNotes: document.getElementById('otherNotes').value.trim(),
-    apprenticeReflection: selectedRole === 'Apprentice' ? document.getElementById('apprenticeReflection').value.trim() : '',
+    apprenticeReflection: selectedNames.some(p => p.role === 'Apprentice') ? document.getElementById('apprenticeReflection').value.trim() : '',
 
     tasksCompleted: dailyPayload.tasksCompleted,
     tasksOutstanding: dailyPayload.tasksCompletedNote,
@@ -1094,7 +1097,7 @@ async function submitEod() {
 }
 
 function resetForm() {
-  selectedName = null; selectedRole = null;
+  selectedNames = [];
   DAILY_CHECKLIST.forEach(q => dailyState[q.id] = null);
   document.querySelectorAll('#nameGrid .pill').forEach(b => b.classList.remove('selected'));
   document.getElementById('jobSelect').value = '';
