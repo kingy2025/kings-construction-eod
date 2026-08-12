@@ -1,0 +1,728 @@
+/**
+ * KINGS CONSTRUCTION — CREW EOD SIGN-OFF APP
+ * Google Apps Script backend (Code.gs)
+ *
+ * SETUP (run once):
+ *   1. Paste this whole file into the Apps Script editor for a new/blank
+ *      Google Sheet (Extensions -> Apps Script).
+ *   2. Update the CONFIG block below (business name, email recipients).
+ *   3. Run the function `setupSheets` once from the Apps Script editor
+ *      (Run menu -> select setupSheets -> Run). It will ask for
+ *      permissions the first time — approve them. This creates the
+ *      Log / Jobs / Touchups tabs with headers and a couple of sample jobs.
+ *   4. Run the function `installTriggers` once. This sets up the
+ *      10-minute email-sending trigger.
+ *   5. Deploy -> New deployment -> type "Web app" -> Execute as: Me,
+ *      Who has access: Anyone. Copy the deployment URL — that's your
+ *      API_URL for index.html.
+ *   6. (Optional) SMS reminders — set Project Settings -> Time zone to
+ *      Australia/Hobart, add TWILIO_SID, TWILIO_AUTH_TOKEN,
+ *      TWILIO_FROM_NUMBER under Project Settings -> Script Properties,
+ *      run `seedRoster` (or fill in the Roster tab by hand), then run
+ *      `installReminderTriggers` once.
+ *
+ * If you're upgrading an existing sheet after adding new checklist
+ * questions, run `resetLog` instead of `setupSheets` — it only clears
+ * and rebuilds the Log tab, leaving your Jobs and Touchups data alone.
+ */
+
+// ============================================================
+// CONFIG — edit this block for your business
+// ============================================================
+const BUSINESS_NAME = 'Kings Construction';           // shown in email subject
+const EMAIL_TO = ['admin@kingsconstructiontas.com'];    // recipients of daily summary, comma-separated list
+const EMAIL_JSA_TO = ['accounts@kingsconstructiontas.com'];    // recipients of morning JSA sign-on email
+
+// Sheet tab names (leave as-is unless you also change index.html expectations)
+const SHEET_LOG = 'Log';
+const SHEET_JOBS = 'Jobs';
+const SHEET_TOUCHUPS = 'Touchups';
+const SHEET_WEEKLY_KPI = 'WeeklyKPI';
+const SHEET_JSA = 'JSA';
+const SHEET_ROSTER = 'Roster';
+
+// Live app URL texted to the crew — update if the GitHub Pages URL changes
+const APP_URL = 'https://kingy2025.github.io/kings-construction-eod/';
+
+const ROSTER_HEADERS = ['Name', 'Phone (E.164 e.g. +614xxxxxxxx)', 'Role (Supervisor/Carpenter)', 'Active'];
+
+const JSA_HEADERS = ['Timestamp', 'Date', 'Job', 'WorkerName', 'Role', 'SignatureImage'];
+
+const WEEKLY_KPI_HEADERS = [
+  'Timestamp', 'WeekStart', 'WeekEnd', 'CrewLeader',
+  'Safety', 'SafetyNote',
+  'Productivity', 'ProductivityNote',
+  'Quality', 'QualityNote',
+  'Leadership', 'LeadershipNote',
+  'Communication', 'CommunicationNote',
+  'CompanyStandards', 'CompanyStandardsNote',
+  'OwnershipInitiative', 'OwnershipInitiativeNote',
+  'CallBacksDefects', 'CallBacksDefectsNote',
+  'UnnecessaryCalls', 'UnnecessaryCallsNote',
+  'TotalScore', 'PerformanceRating', 'BonusEarned',
+  'BiggestWin', 'BiggestChallenge', 'AreasImprovement', 'GoalsNextWeek',
+  'OfficeSupport',
+  'HoursCorrect', 'ReceiptsUploaded'
+];
+
+const LOG_HEADERS = [
+  'Timestamp', 'Date', 'Name', 'Role', 'Job',
+  'TasksDone', 'StageOfWorks', 'JobUpdate',
+  'FlagDamage', 'FlagDamageDetail',
+  'FlagVariation', 'FlagVariationDetail', 'VariationHours',
+  'FlagHoldUp', 'FlagHoldUpDetail',
+  'FlagMaterials', 'FlagMaterialsDetail',
+  'SiteClean', 'SiteCleanNote',
+  'ToolsPacked', 'ToolsPackedNote',
+  'PlantSecured', 'PlantSecuredNote',
+  'WasteSorted', 'WasteSortedNote',
+  'OtherNotes', 'ApprenticeReflection',
+  // --- Daily checklist (Tradify-style) ---
+  'TasksCompleted', 'TasksOutstanding',
+  'ScheduleImpact', 'ScheduleImpactDetail',
+  'PhotosTaken', 'PhotosUploaded',
+  'TimesheetsComplete', 'TimesheetsNote',
+  'ClientHappy', 'ClientHappyDetail',
+  'OfficeAction', 'OfficeActionDetail',
+  'MaterialsToOrder', 'MaterialsToOrderDetail',
+  'ReadyTomorrow', 'ReadyTomorrowDetail',
+  'SafetyIncident', 'SafetyIncidentDetail',
+  'QualityIssue', 'QualityIssueDetail',
+  'GoodDay', 'GoodDayDetail',
+  'Emailed'
+];
+
+// ============================================================
+// ONE-TIME SETUP
+// ============================================================
+function setupSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  resetLog();
+
+  // --- Jobs tab ---
+  let jobs = ss.getSheetByName(SHEET_JOBS);
+  if (!jobs) jobs = ss.insertSheet(SHEET_JOBS);
+  if (jobs.getLastRow() === 0) {
+    jobs.appendRow(['JobName', 'Active', 'Address', 'Notes']);
+    jobs.appendRow(['Sample Job 1 — 12 Smith St', 'Y', '', '']);
+    jobs.appendRow(['Sample Job 2 — 4 Jones Rd', 'Y', '', '']);
+    jobs.setFrozenRows(1);
+  }
+
+  // --- Touchups tab ---
+  let touch = ss.getSheetByName(SHEET_TOUCHUPS);
+  if (!touch) touch = ss.insertSheet(SHEET_TOUCHUPS);
+  if (touch.getLastRow() === 0) {
+    touch.appendRow([
+      'Timestamp', 'Job', 'Type', 'Item', 'Description',
+      'Status', 'AddedBy', 'SupervisorSignoff', 'DateCompleted'
+    ]);
+    touch.setFrozenRows(1);
+  }
+
+  // --- Weekly KPI tab ---
+  addWeeklyKpiTab();
+
+  // --- JSA tab ---
+  addJsaTab();
+
+  // --- Roster tab (SMS reminders) ---
+  addRosterTab();
+
+  SpreadsheetApp.flush();
+  Logger.log('Sheets ready: Log, Jobs, Touchups, WeeklyKPI, JSA, Roster');
+}
+
+// Adds the WeeklyKPI tab if it doesn't already exist. Safe to run any
+// time on its own — won't touch Log, Jobs or Touchups data.
+function addWeeklyKpiTab() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let kpi = ss.getSheetByName(SHEET_WEEKLY_KPI);
+  if (!kpi) kpi = ss.insertSheet(SHEET_WEEKLY_KPI);
+  if (kpi.getLastRow() === 0) {
+    kpi.appendRow(WEEKLY_KPI_HEADERS);
+    kpi.setFrozenRows(1);
+    SpreadsheetApp.flush();
+    Logger.log('WeeklyKPI tab created with ' + WEEKLY_KPI_HEADERS.length + ' columns');
+  } else {
+    Logger.log('WeeklyKPI tab already exists — left untouched');
+  }
+}
+
+// Adds the JSA tab if it doesn't already exist. Safe to run any
+// time on its own — won't touch any other tab's data.
+function addJsaTab() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let jsa = ss.getSheetByName(SHEET_JSA);
+  if (!jsa) jsa = ss.insertSheet(SHEET_JSA);
+  if (jsa.getLastRow() === 0) {
+    jsa.appendRow(JSA_HEADERS);
+    jsa.setFrozenRows(1);
+    SpreadsheetApp.flush();
+    Logger.log('JSA tab created with ' + JSA_HEADERS.length + ' columns');
+  } else {
+    Logger.log('JSA tab already exists — left untouched');
+  }
+}
+
+// Adds the Roster tab if it doesn't already exist. Safe to run any
+// time on its own — won't touch any other tab's data. This is where
+// crew mobile numbers live for the SMS reminders (see sendSms below).
+function addRosterTab() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let roster = ss.getSheetByName(SHEET_ROSTER);
+  if (!roster) roster = ss.insertSheet(SHEET_ROSTER);
+  if (roster.getLastRow() === 0) {
+    roster.appendRow(ROSTER_HEADERS);
+    roster.appendRow(['Example crew leader', '+61412345678', 'Supervisor', 'Y']);
+    roster.setFrozenRows(1);
+    SpreadsheetApp.flush();
+    Logger.log('Roster tab created — add real names/numbers/roles, set Active to Y, delete the example row');
+  } else {
+    Logger.log('Roster tab already exists — left untouched');
+  }
+}
+
+// One-time helper to load the real crew list in one go (overwrites the
+// Roster tab entirely — only run this once when first setting the crew up,
+// or edit the Roster tab directly afterwards instead of re-running this).
+function seedRoster() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let roster = ss.getSheetByName(SHEET_ROSTER);
+  if (!roster) roster = ss.insertSheet(SHEET_ROSTER);
+  roster.clear();
+  roster.appendRow(ROSTER_HEADERS);
+  roster.appendRow(['Matt', '+61405144858', 'Supervisor', 'Y']);
+  roster.appendRow(['Jacko', '+61459608970', 'Supervisor', 'Y']);
+  roster.appendRow(['Ash', '+61402165874', 'Carpenter', 'Y']);
+  roster.appendRow(['Izzy', '+61408777389', 'Carpenter', 'Y']);
+  roster.appendRow(['Rafa', '+61459556756', 'Carpenter', 'Y']);
+  roster.appendRow(['Simon', '+61426638103', 'Carpenter', 'Y']); // TODO confirm role
+  roster.setFrozenRows(1);
+  SpreadsheetApp.flush();
+  Logger.log('Roster seeded with 6 crew members — double check Simon\'s role (defaulted to Carpenter)');
+}
+
+// Rebuilds ONLY the Log tab with the current header list.
+// Safe to re-run any time you add/remove checklist questions —
+// it will NOT touch the Jobs or Touchups tabs.
+function resetLog() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let log = ss.getSheetByName(SHEET_LOG);
+  if (!log) log = ss.insertSheet(SHEET_LOG);
+  log.clear();
+  log.appendRow(LOG_HEADERS);
+  log.setFrozenRows(1);
+  SpreadsheetApp.flush();
+  Logger.log('Log tab rebuilt with ' + LOG_HEADERS.length + ' columns');
+}
+
+function installTriggers() {
+  // Remove any existing processEodEmails triggers first (avoid duplicates)
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'processEodEmails') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  ScriptApp.newTrigger('processEodEmails')
+    .timeBased()
+    .everyMinutes(10)
+    .create();
+  Logger.log('Trigger installed: processEodEmails every 10 minutes');
+}
+
+// Run this once after you've set the Twilio Script Properties (see
+// sendSms below) and populated the Roster tab. Installs the reminder
+// schedule (all times are in the project's timezone — set to
+// Australia/Hobart in Project Settings so these land at the right
+// local time in Tasmania):
+//   - 7:00am Mon-Fri  -> everyone   -> Morning JSA sign-on
+//   - 2:55pm Mon-Fri  -> everyone   -> EOD checklist
+//   - 4:00pm Friday   -> supervisors only -> Weekly KPI scorecard
+function installReminderTriggers() {
+  ['sendMorningReminder', 'sendAfternoonReminder', 'sendFridayKpiReminder'].forEach(fn => {
+    ScriptApp.getProjectTriggers().forEach(t => {
+      if (t.getHandlerFunction() === fn) ScriptApp.deleteTrigger(t);
+    });
+  });
+  ScriptApp.newTrigger('sendMorningReminder')
+    .timeBased().atHour(7).nearMinute(0).everyDays(1).create();
+  ScriptApp.newTrigger('sendAfternoonReminder')
+    .timeBased().atHour(14).nearMinute(55).everyDays(1).create();
+  ScriptApp.newTrigger('sendFridayKpiReminder')
+    .timeBased().onWeekDay(ScriptApp.WeekDay.FRIDAY).atHour(16).nearMinute(0).create();
+  Logger.log('Reminder triggers installed: 7:00am + 2:55pm Mon-Fri, 4:00pm Friday (supervisors only)');
+}
+
+// ============================================================
+// WEB APP ENTRY POINTS
+// ============================================================
+function doGet(e) {
+  const action = e.parameter.action;
+  let result;
+  try {
+    if (action === 'jobs') {
+      result = getActiveJobs();
+    } else if (action === 'log') {
+      result = getLogForDate(e.parameter.date);
+    } else if (action === 'punchlist') {
+      result = getPunchlistForJob(e.parameter.job);
+    } else if (action === 'summary') {
+      result = getSupervisorSummary(e.parameter.date);
+    } else {
+      result = { error: 'Unknown action: ' + action };
+    }
+  } catch (err) {
+    result = { error: err.message };
+  }
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  let result;
+  try {
+    const data = JSON.parse(e.postData.contents);
+    if (data.action === 'eod') {
+      result = writeEodRow(data);
+    } else if (data.action === 'punchlist_add') {
+      result = addPunchlistItem(data);
+    } else if (data.action === 'punchlist_update') {
+      result = updatePunchlistItem(data);
+    } else if (data.action === 'stage_signoff') {
+      result = addStageSignoff(data);
+    } else if (data.action === 'weekly_kpi') {
+      result = writeWeeklyKpiRow(data);
+    } else if (data.action === 'jsa_signon') {
+      result = writeJsaSignon(data);
+    } else {
+      result = { error: 'Unknown action: ' + data.action };
+    }
+  } catch (err) {
+    result = { error: err.message };
+  }
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ============================================================
+// READ HELPERS
+// ============================================================
+function getActiveJobs() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_JOBS);
+  const rows = sheet.getDataRange().getValues();
+  const jobs = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][1]).toUpperCase() === 'Y') {
+      jobs.push(rows[i][0]);
+    }
+  }
+  return { jobs };
+}
+
+function getLogForDate(dateStr) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOG);
+  const rows = sheet.getDataRange().getValues();
+  const headers = rows[0];
+  const targetDate = dateStr || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const entries = [];
+  for (let i = 1; i < rows.length; i++) {
+    const rowDate = rows[i][1]; // 'Date' column
+    if (String(rowDate) === targetDate) {
+      const obj = {};
+      headers.forEach((h, idx) => obj[h] = rows[i][idx]);
+      entries.push(obj);
+    }
+  }
+  return { date: targetDate, entries };
+}
+
+function getSupervisorSummary(dateStr) {
+  const logData = getLogForDate(dateStr);
+  const submittedNames = logData.entries.flatMap(e => String(e.Name || '').split(',').map(s => s.trim()).filter(Boolean));
+  let totalVariationHours = 0;
+  const flags = [];
+  logData.entries.forEach(e => {
+    if (e.VariationHours) totalVariationHours += Number(e.VariationHours) || 0;
+    if (e.FlagDamage) flags.push({ type: 'Damage', name: e.Name, job: e.Job, detail: e.FlagDamageDetail });
+    if (e.FlagVariation) flags.push({ type: 'Variation', name: e.Name, job: e.Job, detail: e.FlagVariationDetail });
+    if (e.FlagHoldUp) flags.push({ type: 'Hold-up', name: e.Name, job: e.Job, detail: e.FlagHoldUpDetail });
+    if (e.FlagMaterials) flags.push({ type: 'Materials', name: e.Name, job: e.Job, detail: e.FlagMaterialsDetail });
+    if (e.SafetyIncident === 'Yes') flags.push({ type: 'SAFETY', name: e.Name, job: e.Job, detail: e.SafetyIncidentDetail });
+    if (e.QualityIssue === 'Yes') flags.push({ type: 'Quality/defect', name: e.Name, job: e.Job, detail: e.QualityIssueDetail });
+    if (e.ScheduleImpact === 'Yes') flags.push({ type: 'Schedule impact', name: e.Name, job: e.Job, detail: e.ScheduleImpactDetail });
+    if (e.OfficeAction === 'Yes') flags.push({ type: 'Office action needed', name: e.Name, job: e.Job, detail: e.OfficeActionDetail });
+    if (e.MaterialsToOrder === 'Yes') flags.push({ type: 'Materials to order', name: e.Name, job: e.Job, detail: e.MaterialsToOrderDetail });
+  });
+  return {
+    date: logData.date,
+    submitted: submittedNames,
+    totalVariationHours,
+    flags,
+    entryCount: logData.entries.length
+  };
+}
+
+function getPunchlistForJob(jobName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_TOUCHUPS);
+  const rows = sheet.getDataRange().getValues();
+  const headers = rows[0];
+  const items = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][1] === jobName) {
+      const obj = {};
+      headers.forEach((h, idx) => obj[h] = rows[i][idx]);
+      items.push(obj);
+    }
+  }
+  return { job: jobName, items };
+}
+
+// ============================================================
+// WRITE HELPERS
+// ============================================================
+function writeEodRow(d) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOG);
+  const now = new Date();
+  const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  sheet.appendRow([
+    now, dateStr, d.name || '', d.role || '', d.job || '',
+    (d.tasksDone || []).join(', '), d.stageOfWorks || '', d.jobUpdate || '',
+    !!d.flagDamage, d.flagDamageDetail || '',
+    !!d.flagVariation, d.flagVariationDetail || '', d.variationHours || '',
+    !!d.flagHoldUp, d.flagHoldUpDetail || '',
+    !!d.flagMaterials, d.flagMaterialsDetail || '',
+    d.siteClean || '', d.siteCleanNote || '',
+    d.toolsPacked || '', d.toolsPackedNote || '',
+    d.plantSecured || '', d.plantSecuredNote || '',
+    d.wasteSorted || '', d.wasteSortedNote || '',
+    d.otherNotes || '', d.apprenticeReflection || '',
+    // --- Daily checklist ---
+    d.tasksCompleted || '', d.tasksOutstanding || '',
+    d.scheduleImpact || '', d.scheduleImpactDetail || '',
+    d.photosTaken || '', d.photosUploaded || '',
+    d.timesheetsComplete || '', d.timesheetsNote || '',
+    d.clientHappy || '', d.clientHappyDetail || '',
+    d.officeAction || '', d.officeActionDetail || '',
+    d.materialsToOrder || '', d.materialsToOrderDetail || '',
+    d.readyTomorrow || '', d.readyTomorrowDetail || '',
+    d.safetyIncident || '', d.safetyIncidentDetail || '',
+    d.qualityIssue || '', d.qualityIssueDetail || '',
+    d.goodDay || '', d.goodDayDetail || '',
+    '' // Emailed — left blank, processEodEmails picks it up
+  ]);
+  return { ok: true };
+}
+
+function addPunchlistItem(d) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_TOUCHUPS);
+  sheet.appendRow([
+    new Date(), d.job || '', 'Defect', d.item || '', d.description || '',
+    'Open', d.addedBy || '', '', ''
+  ]);
+  return { ok: true };
+}
+
+function updatePunchlistItem(d) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_TOUCHUPS);
+  const rows = sheet.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === d.timestamp && rows[i][1] === d.job && rows[i][3] === d.item) {
+      sheet.getRange(i + 1, 6).setValue(d.status || rows[i][5]); // Status col
+      if (d.status === 'Done') {
+        sheet.getRange(i + 1, 9).setValue(new Date()); // DateCompleted col
+      }
+      return { ok: true };
+    }
+  }
+  return { error: 'Item not found' };
+}
+
+function addStageSignoff(d) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_TOUCHUPS);
+  sheet.appendRow([
+    new Date(), d.job || '', 'StageSignoff', d.stage || '', d.notes || '',
+    'Done', d.supervisorName || '', d.supervisorName || '', new Date()
+  ]);
+  return { ok: true };
+}
+
+function writeWeeklyKpiRow(d) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_WEEKLY_KPI);
+  sheet.appendRow([
+    new Date(), d.weekStart || '', d.weekEnd || '', d.crewLeader || '',
+    d.safety || '', d.safetyNote || '',
+    d.productivity || '', d.productivityNote || '',
+    d.quality || '', d.qualityNote || '',
+    d.leadership || '', d.leadershipNote || '',
+    d.communication || '', d.communicationNote || '',
+    d.companyStandards || '', d.companyStandardsNote || '',
+    d.ownershipInitiative || '', d.ownershipInitiativeNote || '',
+    d.callBacksDefects || '', d.callBacksDefectsNote || '',
+    d.unnecessaryCalls || '', d.unnecessaryCallsNote || '',
+    d.totalScore || '', d.performanceRating || '', d.bonusEarned || '',
+    d.biggestWin || '', d.biggestChallenge || '', d.areasImprovement || '', d.goalsNextWeek || '',
+    d.officeSupport || '',
+    d.hoursCorrect || '', d.receiptsUploaded || ''
+  ]);
+
+  try {
+    MailApp.sendEmail({
+      to: EMAIL_TO.join(','),
+      subject: `${BUSINESS_NAME} Weekly KPI — ${d.crewLeader} (${d.weekStart} to ${d.weekEnd}) — ${d.performanceRating}`,
+      htmlBody: formatWeeklyKpi(d)
+    });
+  } catch (err) {
+    Logger.log('Weekly KPI email failed: ' + err.message);
+  }
+
+  return { ok: true };
+}
+
+function writeJsaSignon(d) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_JSA);
+  const now = new Date();
+  const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const workers = d.workers || [];
+  workers.forEach(w => {
+    sheet.appendRow([now, dateStr, d.job || '', w.name || '', w.role || '', w.signature || '']);
+  });
+
+  try {
+    MailApp.sendEmail({
+      to: EMAIL_JSA_TO.join(','),
+      subject: `${BUSINESS_NAME} Morning JSA sign-on — ${d.job} (${dateStr}) — ${workers.length} worker(s)`,
+      htmlBody: formatJsaSignon(d, dateStr)
+    });
+  } catch (err) {
+    Logger.log('JSA sign-on email failed: ' + err.message);
+  }
+
+  return { ok: true };
+}
+
+// ============================================================
+// SMS REMINDERS (Twilio) — morning + afternoon, weekdays only
+// ============================================================
+// Credentials are NOT stored in this file. Set them once via the Apps
+// Script editor: Project Settings (gear icon) -> Script Properties ->
+// add TWILIO_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER (your Twilio
+// SMS-capable number, e.g. +1XXXXXXXXXX).
+//
+// Add crew names/numbers to the Roster tab (Active = Y). Then run
+// installReminderTriggers() once from the editor.
+
+function isWeekday_() {
+  const day = new Date().getDay(); // 0 = Sun, 6 = Sat
+  return day >= 1 && day <= 5;
+}
+
+// 7:00am Mon-Fri, everyone — link straight to the Morning JSA tab
+function sendMorningReminder() {
+  if (!isWeekday_()) return;
+  sendSms(`Morning! Please complete your Morning JSA sign-on before starting work: ${APP_URL}#morning`);
+}
+
+// 2:55pm Mon-Fri, everyone — link straight to the Crew (EOD) tab
+function sendAfternoonReminder() {
+  if (!isWeekday_()) return;
+  sendSms(`End of day reminder: please complete your EOD checklist before knocking off: ${APP_URL}#crew`);
+}
+
+// 4:00pm Friday only, supervisors only — link to the Supervisor (KPI) tab.
+// The trigger itself only fires on Fridays, but the day check is a
+// harmless safety net in case that ever changes.
+function sendFridayKpiReminder() {
+  if (new Date().getDay() !== 5) return;
+  sendSms(`Friday reminder: please complete the Weekly Crew Leader KPI Scorecard: ${APP_URL}#sup`, 'Supervisor');
+}
+
+// roleFilter (optional): 'Supervisor' or 'Carpenter' — only texts Roster
+// rows whose Role column matches (case-insensitive). Omit to text everyone.
+function sendSms(message, roleFilter) {
+  const props = PropertiesService.getScriptProperties();
+  const sid = props.getProperty('TWILIO_SID');
+  const token = props.getProperty('TWILIO_AUTH_TOKEN');
+  const from = props.getProperty('TWILIO_FROM_NUMBER');
+  if (!sid || !token || !from) {
+    Logger.log('Twilio credentials not set in Script Properties — skipping SMS send.');
+    return;
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_ROSTER);
+  if (!sheet) { Logger.log('Roster tab not found — run addRosterTab() first.'); return; }
+
+  const rows = sheet.getDataRange().getValues();
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
+  const authHeader = 'Basic ' + Utilities.base64Encode(sid + ':' + token);
+
+  let sent = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const [name, phone, role, active] = rows[i];
+    if (String(active).toUpperCase() !== 'Y' || !phone) continue;
+    if (roleFilter && String(role).trim().toLowerCase() !== roleFilter.toLowerCase()) continue;
+    try {
+      const resp = UrlFetchApp.fetch(url, {
+        method: 'post',
+        payload: { To: String(phone), From: from, Body: message },
+        headers: { Authorization: authHeader },
+        muteHttpExceptions: true
+      });
+      if (resp.getResponseCode() >= 300) {
+        Logger.log(`SMS failed for ${name} (${phone}): ${resp.getContentText()}`);
+      } else {
+        sent++;
+      }
+    } catch (err) {
+      Logger.log(`SMS failed for ${name} (${phone}): ${err.message}`);
+    }
+  }
+  Logger.log(`SMS reminder sent to ${sent} of ${rows.length - 1} roster entries.`);
+}
+
+// ============================================================
+// EMAIL — reliability pattern: trigger scans for unemailed rows
+// ============================================================
+function processEodEmails() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOG);
+  const rows = sheet.getDataRange().getValues();
+  const headers = rows[0];
+  const emailedCol = headers.indexOf('Emailed') + 1; // 1-based
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][emailedCol - 1]) continue; // already emailed
+    const obj = {};
+    headers.forEach((h, idx) => obj[h] = rows[i][idx]);
+    try {
+      const flagBits = [];
+      if (obj.SafetyIncident === 'Yes') flagBits.push('SAFETY');
+      if (obj.QualityIssue === 'Yes') flagBits.push('DEFECT');
+      const flagPrefix = flagBits.length ? '[' + flagBits.join('/') + '] ' : '';
+      const subject = `${flagPrefix}${BUSINESS_NAME} EOD — ${obj.Name} — ${obj.Job} (${obj.Date})`;
+      MailApp.sendEmail({
+        to: EMAIL_TO.join(','),
+        subject,
+        htmlBody: formatEod(obj)
+      });
+      sheet.getRange(i + 1, emailedCol).setValue(new Date());
+    } catch (err) {
+      Logger.log('Email failed for row ' + (i + 1) + ': ' + err.message);
+      // leave Emailed blank — will retry next run
+    }
+  }
+}
+
+function formatEod(o) {
+  let html = `<h2>${o.Name} (${o.Role}) — ${o.Job}</h2>`;
+
+  html += `<div style="background:#fff8dc;border:1px solid #e0c200;padding:10px;margin:10px 0;">
+    <b>Job update:</b><br>${(o.JobUpdate || '—').replace(/\n/g, '<br>')}
+  </div>`;
+
+  if (o.SafetyIncident === 'Yes') {
+    html += `<div style="background:#fdecea;border:2px solid #c0392b;padding:10px;margin:10px 0;">
+      <b>⚠️ SAFETY INCIDENT / HAZARD / NEAR MISS:</b><br>${o.SafetyIncidentDetail || '—'}
+    </div>`;
+  }
+
+  const flags = [];
+  if (o.FlagDamage) flags.push(`<li><b>Damage / make-good:</b> ${o.FlagDamageDetail || '—'}</li>`);
+  if (o.FlagVariation) flags.push(`<li><b>Variation</b> (${o.VariationHours || 0} hrs): ${o.FlagVariationDetail || '—'}</li>`);
+  if (o.FlagHoldUp) flags.push(`<li><b>Hold-up:</b> ${o.FlagHoldUpDetail || '—'}</li>`);
+  if (o.FlagMaterials) flags.push(`<li><b>Materials low:</b> ${o.FlagMaterialsDetail || '—'}</li>`);
+  if (flags.length) {
+    html += `<div style="background:#fdecea;border:1px solid #c0392b;border-radius:6px;padding:8px 12px;margin:10px 0;"><p style="margin:0 0 4px;"><b>🚩 Flags raised:</b></p><ul style="margin:0;">${flags.join('')}</ul></div>`;
+  } else {
+    html += `<p><b style="color:#2e7d32;">✅ Flags raised:</b> none</p>`;
+  }
+
+  html += `<p><b>Daily checklist:</b></p><ul>`;
+  html += formatCheckLine('Scheduled Tradify tasks completed', o.TasksCompleted, o.TasksOutstanding, 'No');
+  html += formatCheckLine('Anything affecting schedule/timeline', o.ScheduleImpact, o.ScheduleImpactDetail, 'Yes');
+  html += formatCheckLine('Photos taken', o.PhotosTaken, '', 'No');
+  html += formatCheckLine('Progress photos uploaded to Tradify', o.PhotosUploaded, '', 'No');
+  html += formatCheckLine('Tradify timesheets complete & accurate', o.TimesheetsComplete, o.TimesheetsNote, 'No');
+  html += formatCheckLine('Client happy with progress', o.ClientHappy, o.ClientHappyDetail, 'No', 'N/A');
+  html += formatCheckLine('Office needs to action before tomorrow', o.OfficeAction, o.OfficeActionDetail, 'Yes');
+  html += formatCheckLine('Materials need to be ordered', o.MaterialsToOrder, o.MaterialsToOrderDetail, 'Yes');
+  html += formatCheckLine('Ready for tomorrow\'s work', o.ReadyTomorrow, o.ReadyTomorrowDetail, 'No');
+  html += formatCheckLine('Defects / damage / quality issues found', o.QualityIssue, o.QualityIssueDetail, 'Yes');
+  html += formatCheckLine('Job site clean & tidy', o.SiteClean, o.SiteCleanNote, 'No', 'N/A');
+  html += formatCheckLine('Tools packed', o.ToolsPacked, o.ToolsPackedNote, 'No', 'N/A');
+  html += formatCheckLine('Plant / equipment secured', o.PlantSecured, o.PlantSecuredNote, 'No', 'N/A');
+  html += formatCheckLine('Rubbish removed / stored', o.WasteSorted, o.WasteSortedNote, 'No', 'N/A');
+  html += formatCheckLine('Good day', o.GoodDay, o.GoodDayDetail, 'No');
+  html += `</ul>`;
+
+  if (o.OtherNotes) html += `<p><b>Other notes:</b> ${o.OtherNotes}</p>`;
+  if (o.ApprenticeReflection) html += `<p><b>Apprentice reflection:</b> ${o.ApprenticeReflection}</p>`;
+
+  return html;
+}
+
+// Generic line formatter for the daily checklist.
+// alertValue / alertValue2: the answer value(s) that should show the note (if present).
+function formatCheckLine(label, value, note, alertValue, alertValue2) {
+  const isAlert = value === alertValue || (alertValue2 && value === alertValue2);
+  const color = isAlert ? '#c0392b' : '#2e7d32';
+  const dot = isAlert ? '🔴' : '🟢';
+  let line = `<li>${dot} ${label}: <b style="color:${color}">${value || '—'}</b>`;
+  if (note && isAlert) {
+    line += ` — ${note}`;
+  }
+  line += `</li>`;
+  return line;
+}
+
+function formatWeeklyKpi(d) {
+  let html = `<h2>Weekly KPI Scorecard — ${d.crewLeader}</h2>`;
+  html += `<p><b>Week:</b> ${d.weekStart} to ${d.weekEnd}</p>`;
+
+  html += `<div style="background:#fff8dc;border:1px solid #e0c200;padding:10px;margin:10px 0;">
+    <b>Total score:</b> ${d.totalScore} / 45<br>
+    <b>Rating:</b> ${d.performanceRating}<br>
+    <b>Bonus earned:</b> $${d.bonusEarned}
+  </div>`;
+
+  const kpiLines = [
+    ['Safety', d.safety, d.safetyNote],
+    ['Productivity', d.productivity, d.productivityNote],
+    ['Quality', d.quality, d.qualityNote],
+    ['Leadership', d.leadership, d.leadershipNote],
+    ['Communication', d.communication, d.communicationNote],
+    ['Company standards', d.companyStandards, d.companyStandardsNote],
+    ['Ownership & initiative', d.ownershipInitiative, d.ownershipInitiativeNote],
+    ['Call backs for defects', d.callBacksDefects, d.callBacksDefectsNote],
+    ['Un-necessary calls', d.unnecessaryCalls, d.unnecessaryCallsNote]
+  ];
+  html += `<p><b>KPI ratings (out of 5):</b></p><ul>`;
+  kpiLines.forEach(([label, value, note]) => {
+    html += `<li>${label}: <b>${value || '—'}</b>${note ? ' — ' + note : ''}</li>`;
+  });
+  html += `</ul>`;
+
+  html += `<p><b>Everyone's hours done and correct:</b> ${d.hoursCorrect || '—'}</p>`;
+  html += `<p><b>Receipts uploaded correctly with job number (JN):</b> ${d.receiptsUploaded || '—'}</p>`;
+
+  if (d.biggestWin) html += `<p><b>Biggest win this week:</b> ${d.biggestWin}</p>`;
+  if (d.biggestChallenge) html += `<p><b>Biggest challenge this week:</b> ${d.biggestChallenge}</p>`;
+  if (d.areasImprovement) html += `<p><b>Areas for improvement:</b> ${d.areasImprovement}</p>`;
+  if (d.goalsNextWeek) html += `<p><b>Goals for next week:</b> ${d.goalsNextWeek}</p>`;
+  if (d.officeSupport) html += `<p><b>How the office can help:</b> ${d.officeSupport}</p>`;
+
+  return html;
+}
+
+function formatJsaSignon(d, dateStr) {
+  let html = `<h2>Morning JSA sign-on — ${d.job}</h2>`;
+  html += `<p><b>Date:</b> ${dateStr}</p>`;
+  html += `<p>CJP-01 · General construction JSA/SWMS reviewed and acknowledged by the following crew before starting work:</p>`;
+  (d.workers || []).forEach(w => {
+    html += `<div style="margin:14px 0;padding:10px;border:1px solid #ddd;">
+      <b>${w.name}</b> (${w.role || ''})<br>
+      ${w.signature ? `<img src="${w.signature}" style="max-width:280px;border:1px solid #ccc;margin-top:6px;">` : '<i>No signature captured</i>'}
+    </div>`;
+  });
+  return html;
+}
