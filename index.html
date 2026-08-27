@@ -63,6 +63,7 @@
     opacity: 1;
     border-bottom: 3px solid var(--accent);
   }
+  nav.tabs button#tabBtnQC { font-size: 12px; line-height: 1.2; padding: 10px 2px; letter-spacing: 0; }
 
   main { padding: 16px; max-width: 640px; margin: 0 auto; }
   .card {
@@ -306,6 +307,85 @@
   #jsaCanvas { display: block; width: 100%; height: 160px; touch-action: none; }
   .sig-actions { display: flex; gap: 8px; margin-top: 10px; }
   .sig-actions button { flex: 1; }
+
+  /* QC completion checklist */
+  .qc-trade-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .qc-trade-head h2 { margin: 0; }
+  .qc-caret {
+    background: none;
+    border: none;
+    font-size: 20px;
+    line-height: 1;
+    padding: 6px 8px;
+    color: var(--muted);
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+  }
+  .qc-caret.open { transform: rotate(180deg); }
+  .qc-yesno { margin-top: 12px; gap: 8px; }
+  .qc-yesno button { padding: 18px 4px; font-size: 16px; min-height: 56px; letter-spacing: 0.02em; }
+  .qc-defect-box {
+    display: none;
+    margin-top: 14px;
+    background: #fdf1f0;
+    border: 2px solid var(--danger);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .qc-defect-box.show { display: block; }
+  .qc-defect-box label { color: #7a2015; }
+  .qc-photo-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .qc-photo-thumb { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; border: 2px solid var(--danger); }
+  .qc-photo-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    border: 2px dashed var(--muted);
+    background: #fff;
+    font-size: 26px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .qc-detail { display: none; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border); }
+  .qc-detail.show { display: block; }
+  .qc-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    padding: 10px 4px;
+    margin: 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .qc-item:last-child { border-bottom: none; }
+  .qc-item-check {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 2px solid var(--border);
+    background: #fff;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: transparent;
+    transition: all 0.15s ease;
+  }
+  .qc-item.checked { background: #e6f4ea; }
+  .qc-item.checked .qc-item-check { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .qc-item.checked .qc-item-text { color: var(--ok); font-weight: 700; }
+  .qc-notes { min-height: 150px; }
+  #qcSummaryList .summary-row { align-items: center; }
 </style>
 </head>
 <body>
@@ -318,8 +398,8 @@
 <nav class="tabs">
   <button id="tabBtnMorning" onclick="showTab('morning')">START</button>
   <button id="tabBtnCrew" class="active" onclick="showTab('crew')">END</button>
-  <button id="tabBtnSup" onclick="showTab('sup')">Supervisor</button>
-  <button id="tabBtnPunch" onclick="showTab('punch')">Punch-list</button>
+  <button id="tabBtnSup" onclick="showTab('sup')">SUPERVISOR</button>
+  <button id="tabBtnQC" onclick="showTab('qc')">QC / COMPLETION</button>
 </nav>
 
 <main>
@@ -507,39 +587,59 @@
     </div>
   </div>
 
-  <!-- ============ PUNCH-LIST TAB ============ -->
-  <div id="tab-punch" class="hidden">
+  <!-- ============ QC TAB ============ -->
+  <div id="tab-qc" class="hidden">
+
     <div class="card">
-      <h2>Select job</h2>
-      <select id="punchJobSelect"><option value="">Loading jobs…</option></select>
+      <h2>Job &amp; supervisor</h2>
+      <label>JOB</label>
+      <select id="qcJobSelect" onchange="onQcJobChange()"><option value="">Loading jobs…</option></select>
+      <div class="helper" id="qcJobAddress"></div>
+
+      <label>SUPERVISOR</label>
+      <div id="qcSupervisorGrid" class="name-grid"></div>
+
+      <div class="helper" style="margin-top: 12px;">Date: <span id="qcDate"></span></div>
+    </div>
+
+    <div class="card qc-summary-box hidden" id="qcSummaryBox">
+      <h2>Outstanding defects</h2>
+      <div id="qcSummaryList"></div>
+    </div>
+
+    <div id="qcTradesList"></div>
+
+    <div class="card">
+      <h2>COMPLETION</h2>
+
+      <label>IS THE CLIENT HAPPY?</label>
+      <div class="yesno qc-yesno" data-completion="clientHappy">
+        <button class="sel-yes" data-opt="Yes" onclick="setQcCompletion('clientHappy','Yes')">YES</button>
+        <button class="sel-no" data-opt="No" onclick="setQcCompletion('clientHappy','No')">NO</button>
+        <button class="sel-yes" data-opt="N/A" onclick="setQcCompletion('clientHappy','N/A')">N/A</button>
+      </div>
+
+      <label>HAS EVERYTHING BEEN REMOVED FROM THE JOB SITE?</label>
+      <div class="yesno qc-yesno" data-completion="siteCleared">
+        <button class="sel-yes" data-opt="Yes" onclick="setQcCompletion('siteCleared','Yes')">YES</button>
+        <button class="sel-no" data-opt="No" onclick="setQcCompletion('siteCleared','No')">NO</button>
+        <button class="sel-yes" data-opt="N/A" onclick="setQcCompletion('siteCleared','N/A')">N/A</button>
+      </div>
+
+      <label>IS THE JOB SITE CLEAN?</label>
+      <div class="yesno qc-yesno" data-completion="siteClean">
+        <button class="sel-yes" data-opt="Yes" onclick="setQcCompletion('siteClean','Yes')">YES</button>
+        <button class="sel-no" data-opt="No" onclick="setQcCompletion('siteClean','No')">NO</button>
+        <button class="sel-yes" data-opt="N/A" onclick="setQcCompletion('siteClean','N/A')">N/A</button>
+      </div>
     </div>
 
     <div class="card">
-      <h2>Add defect / touch-up item</h2>
-      <label>Item</label>
-      <input type="text" id="punchItem" placeholder="e.g. Paint touch-up hallway">
-      <label>Description</label>
-      <textarea id="punchDescription"></textarea>
-      <label>Your name</label>
-      <input type="text" id="punchAddedBy" placeholder="Your name">
-      <button class="btn-primary" onclick="addPunchItem()">Add to punch-list</button>
+      <h2>NOTES</h2>
+      <textarea id="qcNotes" class="qc-notes" placeholder="Final comments, outstanding defects, client requests, or anything else about completion..."></textarea>
     </div>
 
-    <div class="card">
-      <h2>Open items</h2>
-      <div id="punchList"><p class="helper">Select a job to see its punch-list.</p></div>
-    </div>
-
-    <div class="card">
-      <h2>Stage sign-off (supervisor)</h2>
-      <label>Stage</label>
-      <select id="signoffStage"></select>
-      <label>Notes</label>
-      <textarea id="signoffNotes"></textarea>
-      <label>Supervisor name</label>
-      <input type="text" id="signoffSupervisor" placeholder="Your name">
-      <button class="btn-primary" onclick="submitSignoff()">Sign off stage</button>
-    </div>
+    <button class="btn-primary" id="qcSubmitBtn" onclick="submitQc()">QC COMPLETE</button>
   </div>
 
 </main>
@@ -566,20 +666,6 @@ const CREW = {
     { name: "Rafa", role: "Carpenter" }
   ]
 };
-
-const STAGES = [
-  "Site protection / setup",
-  "Demolition / strip-out",
-  "Drying / remediation",
-  "Framing & carpentry repairs",
-  "Insulation",
-  "Plastering / lining",
-  "Waterproofing & tiling",
-  "Painting",
-  "Fix-out (joinery, fixtures, fittings)",
-  "Final clean & handover",
-  "Defects / make-good"
-];
 
 // Daily checklist questions (Tradify / office questions).
 // Add, remove, or reorder items here — the form and email both
@@ -840,6 +926,82 @@ const JSA_STEPS = [
   }
 ];
 
+// QC completion checklist — trades + their detailed inspection items.
+// Add/remove/reorder trades or items here — the QC tab, validation and
+// the emailed QC report all pick this up automatically.
+const QC_TRADES = [
+  { id: 'electrical', label: 'ELECTRICAL', items: [
+    'Lights working', 'Switches working and straight', 'Power points working and straight',
+    'Exhaust fans working', 'Electrical fittings secure', 'No visible damage',
+    'Electrical fit out clean and complete'
+  ]},
+  { id: 'plumbing', label: 'PLUMBING', items: [
+    'Taps working', 'Hot and cold correct', 'No visible leaks', 'Toilets working correctly',
+    'Basins and sinks draining', 'Shower working', 'Bath working where applicable',
+    'Tapware straight and secure', 'Plumbing fixtures clean'
+  ]},
+  { id: 'tiling', label: 'TILING', items: [
+    'No chipped or damaged tiles', 'No excessive tile lippage', 'Tiles installed straight and aligned',
+    'Grout lines consistent', 'Grout completed properly', 'Silicone neat and complete',
+    'Tile trims neat and secure', 'Floor falls correct', 'No loose tiles', 'All surfaces cleaned'
+  ]},
+  { id: 'painting', label: 'PAINTING', items: [
+    'Correct colour', 'Walls and ceilings evenly painted', 'No visible runs', 'No missed areas',
+    'Cutting in neat', 'Doors and trims finished', 'Touch ups completed',
+    'No paint on fittings, tiles or flooring'
+  ]},
+  { id: 'plaster', label: 'PLASTER', items: [
+    'No visible cracks', 'No obvious dents', 'No visible plaster joins', 'Corners straight',
+    'Square set or cornice neat', 'Patches blend into existing surfaces', 'No obvious sanding defects'
+  ]},
+  { id: 'builders', label: 'BUILDERS', items: [
+    'Framing and structure sound', 'Levels and falls correct', 'Structural fixings complete',
+    'Waterproofing to code', 'Site safety compliance', 'General build quality acceptable'
+  ]},
+  { id: 'carpentry', label: 'CARPENTRY', items: [
+    'Skirting complete and neat', 'Architraves complete and neat', 'Timber work secure',
+    'Doors open and close correctly', 'Handles and locks work', 'Shelving secure', 'Trims complete',
+    'No visible damage', 'General workmanship acceptable'
+  ]},
+  { id: 'joinery', label: 'JOINERY', items: [
+    'Doors aligned', 'Drawers aligned', 'Doors open and close correctly', 'Drawers operate correctly',
+    'Handles straight and secure', 'Benchtops undamaged', 'Kickboards complete', 'Silicone neat',
+    'Joinery clean'
+  ]},
+  { id: 'flooring', label: 'FLOORING', items: [
+    'Flooring complete', 'No visible damage', 'No loose areas', 'Joins neat', 'Transitions neat',
+    'Trims complete', 'Flooring clean'
+  ]},
+  { id: 'showerScreens', label: 'SHOWER SCREENS / MIRRORS / WINDOWS', items: [
+    'Glass undamaged', 'Glass secure', 'Shower doors operate correctly', 'Handles secure',
+    'Silicone neat', 'Mirrors secure', 'Mirrors clean', 'Windows operate correctly',
+    'Window tracks and sills clean', 'Glass clean'
+  ]},
+  { id: 'fixtures', label: 'FIXTURES AND FINISHES', items: [
+    'Towel rails secure', 'Toilet roll holders secure', 'Hooks secure', 'Door stops installed',
+    'Hardware straight', 'Fixtures match selections'
+  ]},
+  { id: 'roofing', label: 'ROOFING', items: [
+    'Roofing visually complete', 'Flashings complete', 'Gutters complete', 'Downpipes connected'
+  ]},
+  { id: 'external', label: 'EXTERNAL', items: [
+    'External sealants complete', 'Cladding and trims complete', 'External work clean'
+  ]},
+  { id: 'finalClean', label: 'FINAL CLEAN', items: [
+    'Floors clean', 'Tiles clean', 'Windows clean', 'Cabinetry clean', 'Bathrooms clean',
+    'Fixtures clean', 'Construction rubbish removed', 'Leftover materials removed',
+    'Job ready to present to client'
+  ]}
+];
+
+// Final completion questions — shown once beneath the trade checklist,
+// using the same YES / NO / N/A colour system.
+const QC_COMPLETION_QUESTIONS = [
+  { id: 'clientHappy', label: 'IS THE CLIENT HAPPY?' },
+  { id: 'siteCleared', label: 'HAS EVERYTHING BEEN REMOVED FROM THE JOB SITE?' },
+  { id: 'siteClean', label: 'IS THE JOB SITE CLEAN?' }
+];
+
 /* ============================================================
    STATE
    ============================================================ */
@@ -854,13 +1016,16 @@ let jsaState = { currentWorker: null, signed: {} };
 let jsaDrawing = false;
 let jsaLastPoint = null;
 let jsaHasSignature = false;
+let qcJobsDetailed = [];
+let qcState = { job: '', jobAddress: '', supervisor: '', trades: {}, completion: {}, notes: '' };
+QC_TRADES.forEach(t => { qcState.trades[t.id] = { status: null, photos: [], rectified: null, items: {} }; });
+QC_COMPLETION_QUESTIONS.forEach(q => { qcState.completion[q.id] = null; });
 
 /* ============================================================
    INIT
    ============================================================ */
 function init() {
   buildNameGrid();
-  buildStageSelects();
   buildDailyChecklist();
   buildWeeklyKpiCrewSelect();
   buildWeeklyKpi();
@@ -868,14 +1033,19 @@ function init() {
   buildJsaCrewGrid();
   buildJsaSteps();
   initJsaCanvas();
+  buildQcTrades();
+  buildQcSupervisorGrid();
+  setQcDate();
   loadJobs();
   document.getElementById('apprenticeCard').classList.add('hidden');
 
-  // Deep-link support: opening the app with #morning / #crew / #sup / #punch
+  // Deep-link support: opening the app with #morning / #crew / #sup / #qc
   // (e.g. from an SMS reminder link) jumps straight to that tab.
+  // '#punch' is kept as an alias so any old bookmarked links still work.
   const hashTab = window.location.hash.replace('#', '');
-  if (['morning', 'crew', 'sup', 'punch'].includes(hashTab)) {
-    showTab(hashTab);
+  const tabAliases = { morning: 'morning', crew: 'crew', sup: 'sup', qc: 'qc', punch: 'qc' };
+  if (tabAliases[hashTab]) {
+    showTab(tabAliases[hashTab]);
   }
 }
 
@@ -913,14 +1083,6 @@ function toggleName(name, role, btnEl) {
   document.getElementById('apprenticeCard').classList.toggle('hidden', !selectedNames.some(p => p.role === 'Apprentice'));
 }
 
-function buildStageSelects() {
-  ['signoffStage'].forEach(id => {
-    const sel = document.getElementById(id);
-    sel.innerHTML = '<option value="">Select stage…</option>' +
-      STAGES.map(s => `<option value="${s}">${s}</option>`).join('');
-  });
-}
-
 function buildDailyChecklist() {
   const container = document.getElementById('dailyChecklist');
   container.innerHTML = DAILY_CHECKLIST.map(q => {
@@ -947,10 +1109,13 @@ async function loadJobs() {
     const res = await fetch(`${API_URL}?action=jobs`);
     const data = await res.json();
     const jobs = data.jobs || [];
+    // jobDetails (with addresses) is optional — falls back gracefully on an
+    // older backend that only returns the plain jobs list.
+    qcJobsDetailed = data.jobDetails || jobs.map(j => ({ name: j, address: '' }));
     const opts = '<option value="">Select job…</option>' + jobs.map(j => `<option value="${j}">${j}</option>`).join('');
     document.getElementById('jobSelect').innerHTML = opts;
-    document.getElementById('punchJobSelect').innerHTML = opts;
     document.getElementById('jsaJobSelect').innerHTML = opts;
+    document.getElementById('qcJobSelect').innerHTML = opts;
   } catch (e) {
     document.getElementById('jobSelect').innerHTML = '<option value="">Could not load jobs — check connection</option>';
   }
@@ -963,12 +1128,12 @@ function showTab(tab) {
   document.getElementById('tab-morning').classList.toggle('hidden', tab !== 'morning');
   document.getElementById('tab-crew').classList.toggle('hidden', tab !== 'crew');
   document.getElementById('tab-sup').classList.toggle('hidden', tab !== 'sup');
-  document.getElementById('tab-punch').classList.toggle('hidden', tab !== 'punch');
+  document.getElementById('tab-qc').classList.toggle('hidden', tab !== 'qc');
   document.getElementById('tabBtnMorning').classList.toggle('active', tab === 'morning');
   document.getElementById('tabBtnCrew').classList.toggle('active', tab === 'crew');
   document.getElementById('tabBtnSup').classList.toggle('active', tab === 'sup');
-  document.getElementById('tabBtnPunch').classList.toggle('active', tab === 'punch');
-  if (tab === 'punch') loadPunchlistForSelectedJob();
+  document.getElementById('tabBtnQC').classList.toggle('active', tab === 'qc');
+  if (tab === 'qc') setQcDate();
 }
 
 /* ============================================================
@@ -1316,74 +1481,290 @@ async function loadSupervisorSummary() {
 }
 
 /* ============================================================
-   PUNCH-LIST TAB
+   QC TAB — fast completion checklist
    ============================================================ */
-document.addEventListener('change', (e) => {
-  if (e.target.id === 'punchJobSelect') loadPunchlistForSelectedJob();
-});
-
-async function loadPunchlistForSelectedJob() {
-  const job = document.getElementById('punchJobSelect').value;
-  const listEl = document.getElementById('punchList');
-  if (!job) { listEl.innerHTML = '<p class="helper">Select a job to see its punch-list.</p>'; return; }
-  listEl.innerHTML = '<p class="helper">Loading…</p>';
-  try {
-    const res = await fetch(`${API_URL}?action=punchlist&job=${encodeURIComponent(job)}`);
-    const data = await res.json();
-    if (!data.items.length) { listEl.innerHTML = '<p class="helper">No items yet.</p>'; return; }
-    listEl.innerHTML = data.items.map(it => `
-      <div class="job-item ${it.Status === 'Done' ? 'done' : ''}">
-        <strong>${it.Item || it.Stage}</strong> <span class="badge ${it.Status === 'Done' ? 'ok' : 'warn'}">${it.Status}</span><br>
-        <span class="helper">${it.Description || ''}</span>
-      </div>`).join('');
-  } catch (e) {
-    listEl.innerHTML = '<p class="helper">Could not load punch-list.</p>';
-  }
+function buildQcSupervisorGrid() {
+  const grid = document.getElementById('qcSupervisorGrid');
+  grid.innerHTML = '';
+  const supervisors = CREW['Supervisors'] || [];
+  supervisors.forEach(p => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pill';
+    btn.textContent = p.name;
+    btn.onclick = () => selectQcSupervisor(p.name, btn);
+    grid.appendChild(btn);
+  });
 }
 
-async function addPunchItem() {
-  const job = document.getElementById('punchJobSelect').value;
-  const item = document.getElementById('punchItem').value.trim();
-  const description = document.getElementById('punchDescription').value.trim();
-  const addedBy = document.getElementById('punchAddedBy').value.trim();
-  if (!job) return alert('Select a job first.');
-  if (!item) return alert('Enter an item.');
+function selectQcSupervisor(name, btnEl) {
+  qcState.supervisor = name;
+  document.querySelectorAll('#qcSupervisorGrid .pill').forEach(b => b.classList.remove('selected'));
+  btnEl.classList.add('selected');
+}
+
+function setQcDate() {
+  const el = document.getElementById('qcDate');
+  if (el) el.textContent = new Date().toLocaleDateString('en-AU');
+}
+
+function onQcJobChange() {
+  const job = document.getElementById('qcJobSelect').value;
+  qcState.job = job;
+  const match = qcJobsDetailed.find(j => j.name === job);
+  qcState.jobAddress = match ? (match.address || '') : '';
+  document.getElementById('qcJobAddress').textContent = qcState.jobAddress ? ('Address: ' + qcState.jobAddress) : '';
+}
+
+function buildQcTrades() {
+  const container = document.getElementById('qcTradesList');
+  container.innerHTML = QC_TRADES.map(t => `
+    <div class="card qc-trade" id="qc-trade-${t.id}">
+      <div class="qc-trade-head">
+        <h2>${t.label}</h2>
+        <button type="button" class="qc-caret" id="qc-caret-${t.id}" onclick="toggleQcDetail('${t.id}')">▾</button>
+      </div>
+      <div class="yesno qc-yesno" data-trade="${t.id}">
+        <button class="sel-yes" data-opt="Yes" onclick="setQcStatus('${t.id}','Yes')">YES</button>
+        <button class="sel-no" data-opt="No" onclick="setQcStatus('${t.id}','No')">NO</button>
+        <button class="sel-yes" data-opt="N/A" onclick="setQcStatus('${t.id}','N/A')">N/A</button>
+      </div>
+
+      <div class="qc-defect-box" id="qc-defect-${t.id}">
+        <label>Photo <span class="required-star">*</span></label>
+        <div class="qc-photo-row" id="qc-photos-${t.id}">
+          <label class="qc-photo-btn">+
+            <input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="handleQcPhoto('${t.id}', this)">
+          </label>
+        </div>
+
+        <label>What's the defect? <span class="required-star">*</span></label>
+        <textarea id="qc-desc-${t.id}" placeholder="Short description"></textarea>
+
+        <label>Responsible trade / person (if known)</label>
+        <input type="text" id="qc-resp-${t.id}" placeholder="e.g. Rafa, or the tiler">
+
+        <label>Rectified on the spot? <span class="required-star">*</span></label>
+        <div class="yesno" data-field="qc-rect-${t.id}">
+          <button class="sel-yes" onclick="setQcRectified('${t.id}','Yes')">YES</button>
+          <button class="sel-no" onclick="setQcRectified('${t.id}','No')">NO</button>
+        </div>
+      </div>
+
+      <div class="qc-detail" id="qc-detail-${t.id}">
+        ${t.items.map((item, i) => `
+          <div class="qc-item" id="qc-item-${t.id}-${i}" onclick="toggleQcItem('${t.id}',${i})">
+            <span class="qc-item-check">✓</span><span class="qc-item-text">${item}</span>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function toggleQcDetail(id) {
+  document.getElementById('qc-detail-' + id).classList.toggle('show');
+  document.getElementById('qc-caret-' + id).classList.toggle('open');
+}
+
+// Ticking an individual checklist item just marks it inspected & passed —
+// it turns green so it's obvious at a glance what's been checked. A failed
+// item doesn't get ticked; the trade itself gets marked NO instead, which
+// drives the defect capture below.
+function toggleQcItem(tradeId, idx) {
+  const st = qcState.trades[tradeId];
+  st.items[idx] = !st.items[idx];
+  document.getElementById(`qc-item-${tradeId}-${idx}`).classList.toggle('checked', !!st.items[idx]);
+}
+
+function setQcStatus(id, value) {
+  qcState.trades[id].status = value;
+  const group = document.querySelector(`.qc-yesno[data-trade="${id}"]`);
+  group.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+  const btn = [...group.querySelectorAll('button')].find(b => b.dataset.opt === value);
+  if (btn) btn.classList.add('selected');
+  document.getElementById('qc-defect-' + id).classList.toggle('show', value === 'No');
+
+  // Selecting YES automatically opens the detailed checklist underneath —
+  // NO keeps its existing behaviour (defect box only; the detail list can
+  // still be opened manually via the arrow if needed).
+  if (value === 'Yes') {
+    document.getElementById('qc-detail-' + id).classList.add('show');
+    document.getElementById('qc-caret-' + id).classList.add('open');
+  }
+  updateQcSummary();
+}
+
+function setQcRectified(id, value) {
+  qcState.trades[id].rectified = value;
+  const group = document.querySelector(`.yesno[data-field="qc-rect-${id}"]`);
+  group.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+  if (value === 'Yes') group.querySelector('.sel-yes').classList.add('selected');
+  if (value === 'No') group.querySelector('.sel-no').classList.add('selected');
+  updateQcSummary();
+}
+
+function setQcCompletion(id, value) {
+  qcState.completion[id] = value;
+  const group = document.querySelector(`.qc-yesno[data-completion="${id}"]`);
+  group.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+  const btn = [...group.querySelectorAll('button')].find(b => b.dataset.opt === value);
+  if (btn) btn.classList.add('selected');
+}
+
+// Photos are downscaled + compressed client-side before being held in
+// memory (and later sent to the backend as JPEG data URLs) — keeps
+// on-site mobile uploads fast even on a slow site connection.
+function compressQcImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1280;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+          else { width = Math.round(width * maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleQcPhoto(tradeId, inputEl) {
+  const files = Array.from(inputEl.files || []);
+  for (const file of files) {
+    try {
+      const dataUrl = await compressQcImage(file);
+      qcState.trades[tradeId].photos.push(dataUrl);
+    } catch (e) { /* skip unreadable file */ }
+  }
+  inputEl.value = '';
+  renderQcPhotos(tradeId);
+}
+
+function renderQcPhotos(tradeId) {
+  const row = document.getElementById('qc-photos-' + tradeId);
+  const addBtnHtml = row.querySelector('.qc-photo-btn').outerHTML;
+  const photos = qcState.trades[tradeId].photos;
+  row.innerHTML = photos.map((p, i) =>
+    `<img class="qc-photo-thumb" src="${p}" onclick="removeQcPhoto('${tradeId}',${i})" title="Tap to remove">`
+  ).join('') + addBtnHtml;
+}
+
+function removeQcPhoto(tradeId, idx) {
+  qcState.trades[tradeId].photos.splice(idx, 1);
+  renderQcPhotos(tradeId);
+}
+
+function updateQcSummary() {
+  const box = document.getElementById('qcSummaryBox');
+  const list = document.getElementById('qcSummaryList');
+  const noTrades = QC_TRADES.filter(t => qcState.trades[t.id].status === 'No');
+  if (!noTrades.length) {
+    box.classList.add('hidden');
+    list.innerHTML = '';
+    return;
+  }
+  box.classList.remove('hidden');
+  list.innerHTML = noTrades.map(t => {
+    const rectified = qcState.trades[t.id].rectified;
+    const badge = rectified === 'Yes' ? '<span class="badge ok">Rectified</span>' : '<span class="badge warn">Outstanding</span>';
+    return `<div class="summary-row"><span>${t.label}</span>${badge}</div>`;
+  }).join('');
+}
+
+async function submitQc() {
+  if (!qcState.job) return alert('Please select a job.');
+  if (!qcState.supervisor) return alert('Please select the supervisor doing the QC walk.');
+
+  const unanswered = QC_TRADES.filter(t => !qcState.trades[t.id].status);
+  if (unanswered.length) return alert('Please select YES, NO or N/A for: ' + unanswered.map(t => t.label).join(', '));
+
+  const unansweredCompletion = QC_COMPLETION_QUESTIONS.filter(q => !qcState.completion[q.id]);
+  if (unansweredCompletion.length) return alert('Please answer: ' + unansweredCompletion.map(q => q.label).join(', '));
+
+  const noTrades = QC_TRADES.filter(t => qcState.trades[t.id].status === 'No');
+  for (const t of noTrades) {
+    const st = qcState.trades[t.id];
+    if (!st.photos.length) return alert(`${t.label} is marked NO — please add a photo of the defect.`);
+    if (!document.getElementById('qc-desc-' + t.id).value.trim()) return alert(`${t.label} is marked NO — please add a short defect description.`);
+    if (!st.rectified) return alert(`${t.label} is marked NO — please confirm whether it's been rectified.`);
+  }
+
+  if (noTrades.length) {
+    const names = noTrades.map(t => t.label).join(', ');
+    const proceed = confirm(`This QC report has ${noTrades.length} item(s) marked NO: ${names}.\n\nYou can still submit — outstanding defects stay clearly visible on the report. Submit now?`);
+    if (!proceed) return;
+  }
+
+  const btn = document.getElementById('qcSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  const tradesPayload = {};
+  QC_TRADES.forEach(t => {
+    const st = qcState.trades[t.id];
+    tradesPayload[t.id] = {
+      label: t.label,
+      status: st.status,
+      description: st.status === 'No' ? document.getElementById('qc-desc-' + t.id).value.trim() : '',
+      responsible: st.status === 'No' ? document.getElementById('qc-resp-' + t.id).value.trim() : '',
+      rectified: st.status === 'No' ? st.rectified : '',
+      photos: st.status === 'No' ? st.photos : [],
+      checkedItems: t.items.filter((item, i) => st.items[i])
+    };
+  });
+
+  const completionPayload = {};
+  QC_COMPLETION_QUESTIONS.forEach(q => { completionPayload[q.id] = { label: q.label, status: qcState.completion[q.id] }; });
+
+  const payload = {
+    action: 'qc_submit',
+    job: qcState.job,
+    jobAddress: qcState.jobAddress,
+    supervisor: qcState.supervisor,
+    trades: tradesPayload,
+    completion: completionPayload,
+    notes: document.getElementById('qcNotes').value.trim()
+  };
+
   try {
     await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'punchlist_add', job, item, description, addedBy })
+      body: JSON.stringify(payload)
     });
-    document.getElementById('punchItem').value = '';
-    document.getElementById('punchDescription').value = '';
-    showToast('Added to punch-list');
-    loadPunchlistForSelectedJob();
+    showToast(noTrades.length ? `QC submitted — ${noTrades.length} defect(s) outstanding` : 'QC complete — all good!');
+    resetQcForm();
   } catch (e) {
-    showToast('Could not add item', true);
+    showToast('Could not submit QC report — check your connection and try again.', true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'QC COMPLETE';
   }
 }
 
-async function submitSignoff() {
-  const job = document.getElementById('punchJobSelect').value;
-  const stage = document.getElementById('signoffStage').value;
-  const notes = document.getElementById('signoffNotes').value.trim();
-  const supervisorName = document.getElementById('signoffSupervisor').value.trim();
-  if (!job) return alert('Select a job first.');
-  if (!stage) return alert('Select a stage.');
-  if (!supervisorName) return alert('Supervisor name is required for sign-off.');
-  try {
-    await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'stage_signoff', job, stage, notes, supervisorName })
-    });
-    document.getElementById('signoffNotes').value = '';
-    document.getElementById('signoffSupervisor').value = '';
-    showToast('Stage signed off');
-    loadPunchlistForSelectedJob();
-  } catch (e) {
-    showToast('Could not sign off', true);
-  }
+function resetQcForm() {
+  qcState = { job: '', jobAddress: '', supervisor: '', trades: {}, completion: {}, notes: '' };
+  QC_TRADES.forEach(t => { qcState.trades[t.id] = { status: null, photos: [], rectified: null, items: {} }; });
+  QC_COMPLETION_QUESTIONS.forEach(q => { qcState.completion[q.id] = null; });
+  document.getElementById('qcJobSelect').value = '';
+  document.getElementById('qcJobAddress').textContent = '';
+  document.getElementById('qcNotes').value = '';
+  document.querySelectorAll('#qcSupervisorGrid .pill').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.qc-yesno[data-completion] button').forEach(b => b.classList.remove('selected'));
+  buildQcTrades();
+  updateQcSummary();
+  window.scrollTo(0, 0);
 }
 
 /* ============================================================
