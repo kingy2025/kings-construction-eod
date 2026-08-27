@@ -1585,10 +1585,21 @@ function setQcStatus(id, value) {
 
   // Selecting YES automatically opens the detailed checklist underneath —
   // NO keeps its existing behaviour (defect box only; the detail list can
-  // still be opened manually via the arrow if needed).
-  if (value === 'Yes') {
-    document.getElementById('qc-detail-' + id).classList.add('show');
-    document.getElementById('qc-caret-' + id).classList.add('open');
+  // still be opened manually via the arrow if needed). N/A means there's
+  // nothing to inspect, so the expand arrow is hidden entirely — no
+  // dropdown needed.
+  const detail = document.getElementById('qc-detail-' + id);
+  const caret = document.getElementById('qc-caret-' + id);
+  if (value === 'N/A') {
+    detail.classList.remove('show');
+    caret.classList.remove('open');
+    caret.classList.add('hidden');
+  } else {
+    caret.classList.remove('hidden');
+    if (value === 'Yes') {
+      detail.classList.add('show');
+      caret.classList.add('open');
+    }
   }
   updateQcSummary();
 }
