@@ -396,8 +396,8 @@
 </header>
 
 <nav class="tabs">
-  <button id="tabBtnMorning" onclick="showTab('morning')">START</button>
-  <button id="tabBtnCrew" class="active" onclick="showTab('crew')">END</button>
+  <button id="tabBtnMorning" onclick="showTab('morning')">JOB START</button>
+  <button id="tabBtnCrew" class="active" onclick="showTab('crew')">JOB END</button>
   <button id="tabBtnSup" onclick="showTab('sup')">SUPERVISOR</button>
   <button id="tabBtnQC" onclick="showTab('qc')">QC / COMPLETION</button>
 </nav>
@@ -591,7 +591,7 @@
   <div id="tab-qc" class="hidden">
 
     <div class="card">
-      <h2>Job &amp; supervisor</h2>
+      <h2>QC/COMPLETION</h2>
       <label>JOB</label>
       <select id="qcJobSelect" onchange="onQcJobChange()"><option value="">Loading jobs…</option></select>
       <div class="helper" id="qcJobAddress"></div>
@@ -618,6 +618,10 @@
         <button class="sel-no" data-opt="No" onclick="setQcCompletion('clientHappy','No')">NO</button>
         <button class="sel-yes" data-opt="N/A" onclick="setQcCompletion('clientHappy','N/A')">N/A</button>
       </div>
+      <div class="qc-defect-box" id="qc-completion-reason-box-clientHappy">
+        <label>WHY NOT? <span class="required-star">*</span></label>
+        <textarea id="qc-completion-reason-clientHappy" placeholder="What's the issue?"></textarea>
+      </div>
 
       <label>HAS EVERYTHING BEEN REMOVED FROM THE JOB SITE?</label>
       <div class="yesno qc-yesno" data-completion="siteCleared">
@@ -625,12 +629,20 @@
         <button class="sel-no" data-opt="No" onclick="setQcCompletion('siteCleared','No')">NO</button>
         <button class="sel-yes" data-opt="N/A" onclick="setQcCompletion('siteCleared','N/A')">N/A</button>
       </div>
+      <div class="qc-defect-box" id="qc-completion-reason-box-siteCleared">
+        <label>WHY NOT? <span class="required-star">*</span></label>
+        <textarea id="qc-completion-reason-siteCleared" placeholder="What's still on site?"></textarea>
+      </div>
 
       <label>IS THE JOB SITE CLEAN?</label>
       <div class="yesno qc-yesno" data-completion="siteClean">
         <button class="sel-yes" data-opt="Yes" onclick="setQcCompletion('siteClean','Yes')">YES</button>
         <button class="sel-no" data-opt="No" onclick="setQcCompletion('siteClean','No')">NO</button>
         <button class="sel-yes" data-opt="N/A" onclick="setQcCompletion('siteClean','N/A')">N/A</button>
+      </div>
+      <div class="qc-defect-box" id="qc-completion-reason-box-siteClean">
+        <label>WHY NOT? <span class="required-star">*</span></label>
+        <textarea id="qc-completion-reason-siteClean" placeholder="What needs cleaning?"></textarea>
       </div>
     </div>
 
@@ -1019,7 +1031,7 @@ let jsaHasSignature = false;
 let qcJobsDetailed = [];
 let qcState = { job: '', jobAddress: '', supervisor: '', trades: {}, completion: {}, notes: '' };
 QC_TRADES.forEach(t => { qcState.trades[t.id] = { status: null, photos: [], rectified: null, items: {} }; });
-QC_COMPLETION_QUESTIONS.forEach(q => { qcState.completion[q.id] = null; });
+QC_COMPLETION_QUESTIONS.forEach(q => { qcState.completion[q.id] = { status: null, reason: '' }; });
 
 /* ============================================================
    INIT
@@ -1614,11 +1626,12 @@ function setQcRectified(id, value) {
 }
 
 function setQcCompletion(id, value) {
-  qcState.completion[id] = value;
+  qcState.completion[id].status = value;
   const group = document.querySelector(`.qc-yesno[data-completion="${id}"]`);
   group.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
   const btn = [...group.querySelectorAll('button')].find(b => b.dataset.opt === value);
   if (btn) btn.classList.add('selected');
+  document.getElementById('qc-completion-reason-box-' + id).classList.toggle('show', value === 'No');
 }
 
 // Photos are downscaled + compressed client-side before being held in
@@ -1700,8 +1713,14 @@ async function submitQc() {
   const unanswered = QC_TRADES.filter(t => !qcState.trades[t.id].status);
   if (unanswered.length) return alert('Please select YES, NO or N/A for: ' + unanswered.map(t => t.label).join(', '));
 
-  const unansweredCompletion = QC_COMPLETION_QUESTIONS.filter(q => !qcState.completion[q.id]);
+  const unansweredCompletion = QC_COMPLETION_QUESTIONS.filter(q => !qcState.completion[q.id].status);
   if (unansweredCompletion.length) return alert('Please answer: ' + unansweredCompletion.map(q => q.label).join(', '));
+
+  for (const q of QC_COMPLETION_QUESTIONS) {
+    if (qcState.completion[q.id].status === 'No' && !document.getElementById('qc-completion-reason-' + q.id).value.trim()) {
+      return alert(`"${q.label}" is marked NO — please add a reason why.`);
+    }
+  }
 
   const noTrades = QC_TRADES.filter(t => qcState.trades[t.id].status === 'No');
   for (const t of noTrades) {
@@ -1736,7 +1755,14 @@ async function submitQc() {
   });
 
   const completionPayload = {};
-  QC_COMPLETION_QUESTIONS.forEach(q => { completionPayload[q.id] = { label: q.label, status: qcState.completion[q.id] }; });
+  QC_COMPLETION_QUESTIONS.forEach(q => {
+    const st = qcState.completion[q.id];
+    completionPayload[q.id] = {
+      label: q.label,
+      status: st.status,
+      reason: st.status === 'No' ? document.getElementById('qc-completion-reason-' + q.id).value.trim() : ''
+    };
+  });
 
   const payload = {
     action: 'qc_submit',
@@ -1767,12 +1793,16 @@ async function submitQc() {
 function resetQcForm() {
   qcState = { job: '', jobAddress: '', supervisor: '', trades: {}, completion: {}, notes: '' };
   QC_TRADES.forEach(t => { qcState.trades[t.id] = { status: null, photos: [], rectified: null, items: {} }; });
-  QC_COMPLETION_QUESTIONS.forEach(q => { qcState.completion[q.id] = null; });
+  QC_COMPLETION_QUESTIONS.forEach(q => { qcState.completion[q.id] = { status: null, reason: '' }; });
   document.getElementById('qcJobSelect').value = '';
   document.getElementById('qcJobAddress').textContent = '';
   document.getElementById('qcNotes').value = '';
   document.querySelectorAll('#qcSupervisorGrid .pill').forEach(b => b.classList.remove('selected'));
   document.querySelectorAll('.qc-yesno[data-completion] button').forEach(b => b.classList.remove('selected'));
+  QC_COMPLETION_QUESTIONS.forEach(q => {
+    document.getElementById('qc-completion-reason-box-' + q.id).classList.remove('show');
+    document.getElementById('qc-completion-reason-' + q.id).value = '';
+  });
   buildQcTrades();
   updateQcSummary();
   window.scrollTo(0, 0);
