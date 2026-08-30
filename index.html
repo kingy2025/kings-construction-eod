@@ -596,7 +596,7 @@
       <select id="qcJobSelect" onchange="onQcJobChange()"><option value="">Loading jobs…</option></select>
       <div class="helper" id="qcJobAddress"></div>
 
-      <label>SUPERVISOR</label>
+      <label>COMPLETED BY</label>
       <div id="qcSupervisorGrid" class="name-grid"></div>
 
       <div class="helper" style="margin-top: 12px;">Date: <span id="qcDate"></span></div>
@@ -1498,8 +1498,8 @@ async function loadSupervisorSummary() {
 function buildQcSupervisorGrid() {
   const grid = document.getElementById('qcSupervisorGrid');
   grid.innerHTML = '';
-  const supervisors = CREW['Supervisors'] || [];
-  supervisors.forEach(p => {
+  const everyone = Object.values(CREW).flat();
+  everyone.forEach(p => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'pill';
