@@ -471,48 +471,14 @@
     </div>
 
     <div class="card highlight-box">
-      <label>Job update <span class="required-star">*</span> — where's the job at, what's left, any blockers?</label>
+      <label>Job update <span class="required-star">*</span> — where's the job at and what's left?</label>
       <textarea id="jobUpdate" placeholder="e.g. Demo complete in bathroom, plaster booked for Thursday, waiting on tile delivery..."></textarea>
     </div>
 
     <div class="card">
       <h2>Daily checklist</h2>
-      <div class="card-sub">Tradify / office questions — answer all of these</div>
+      <div class="card-sub">TRADIEXAI / office questions — answer all of these</div>
       <div id="dailyChecklist"></div>
-    </div>
-
-    <div class="card">
-      <h2>Flag to the boss</h2>
-
-      <div class="flag-item" id="flagDamage">
-        <div class="flag-header"><input type="checkbox" id="chkDamage" onchange="toggleFlag('Damage')"> Damage / make-good needed</div>
-        <div class="flag-detail hidden" id="detailDamage">
-          <textarea id="detailDamageText" placeholder="What's damaged, where, how bad?"></textarea>
-        </div>
-      </div>
-
-      <div class="flag-item" id="flagVariation">
-        <div class="flag-header"><input type="checkbox" id="chkVariation" onchange="toggleFlag('Variation')"> Variation (extra work/hours)</div>
-        <div class="flag-detail hidden" id="detailVariation">
-          <textarea id="detailVariationText" placeholder="What extra work and why?"></textarea>
-          <label>Extra hours logged</label>
-          <input type="number" id="variationHours" min="0" step="0.5" placeholder="e.g. 2">
-        </div>
-      </div>
-
-      <div class="flag-item" id="flagHoldUp">
-        <div class="flag-header"><input type="checkbox" id="chkHoldUp" onchange="toggleFlag('HoldUp')"> Hold-up (weather, other trades, inspections, deliveries)</div>
-        <div class="flag-detail hidden" id="detailHoldUp">
-          <textarea id="detailHoldUpText" placeholder="What held things up?"></textarea>
-        </div>
-      </div>
-
-      <div class="flag-item" id="flagMaterials">
-        <div class="flag-header"><input type="checkbox" id="chkMaterials" onchange="toggleFlag('Materials')"> Materials running low</div>
-        <div class="flag-detail hidden" id="detailMaterials">
-          <textarea id="detailMaterialsText" placeholder="What's needed?"></textarea>
-        </div>
-      </div>
     </div>
 
     <div class="card" id="apprenticeCard">
@@ -544,17 +510,19 @@ const SUPERVISOR_PIN = "2580";
 const CREW = {
   "Supervisors": [
     { name: "Matt", role: "Supervisor" },
-    { name: "Jackson", role: "Supervisor" }
+    { name: "Jackson", role: "Supervisor" },
+    { name: "Zach", role: "Supervisor" }
   ],
   "Carpenters": [
     { name: "Ash", role: "Apprentice" },
     { name: "Izzy", role: "Apprentice" },
-    { name: "Zach", role: "Carpenter" },
-    { name: "Rafa", role: "Carpenter" }, { name: "Lucas", role: "Apprentice" }, { name: "Jordan", role: "Apprentice" }
+    { name: "Rafa", role: "Carpenter" },
+    { name: "Lucas", role: "Apprentice" },
+    { name: "Jordan", role: "Apprentice" }
   ]
 };
 
-// Daily checklist questions (Tradify / office questions).
+// Daily checklist questions (TRADIEXAI / office questions).
 // Add, remove, or reorder items here — the form and email both
 // pick this up automatically. "options" is ['Yes','No'] or
 // ['Yes','No','N/A']. "noteWhen" lists which answer(s) should pop
@@ -565,11 +533,14 @@ const CREW = {
 // reflect what's actually good news vs. what needs attention, rather than
 // Yes always being green and No always being red.
 const DAILY_CHECKLIST = [
-  { id: 'tasksCompleted', label: 'Were all scheduled Tradify tasks completed today?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: "What's still outstanding?", noteRequired: true, goodAnswers: ['Yes'] },
+  { id: 'tasksCompleted', label: 'Were all scheduled TRADIEXAI tasks completed today?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: "What's still outstanding?", noteRequired: true, goodAnswers: ['Yes'], extraFields: [
+    { id: 'tasksTimeNeeded', label: 'How much longer do you estimate?', placeholder: 'e.g. 1 more day, 4 hours' },
+    { id: 'tasksCrewNeeded', label: 'How many guys will it need?', placeholder: 'e.g. 2', type: 'number' }
+  ] },
   { id: 'scheduleImpact', label: 'Is there anything that will affect the current schedule or timeline?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'What, and how?', noteRequired: true, goodAnswers: ['No'] },
   { id: 'photosTaken', label: 'Were all required photos taken today?', options: ['Yes','No','N/A'], noteWhen: [], noteRequired: false, goodAnswers: ['Yes'] },
-  { id: 'photosUploaded', label: 'Were all required progress photos uploaded to Tradify?', options: ['Yes','No','N/A'], noteWhen: [], noteRequired: false, goodAnswers: ['Yes'] },
-  { id: 'timesheetsComplete', label: 'Are your Tradify timesheets complete and accurate?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: 'What needs fixing?', noteRequired: false, goodAnswers: ['Yes'] },
+  { id: 'photosUploaded', label: 'Were all required progress photos uploaded to TRADIEXAI?', options: ['Yes','No','N/A'], noteWhen: [], noteRequired: false, goodAnswers: ['Yes'] },
+  { id: 'timesheetsComplete', label: 'Are your TRADIEXAI timesheets complete and accurate?', options: ['Yes','No'], noteWhen: ['No'], notePrompt: 'What needs fixing?', noteRequired: false, goodAnswers: ['Yes'] },
   { id: 'clientHappy', label: "Is the client happy with today's progress?", options: ['Yes','No','N/A'], noteWhen: ['No'], notePrompt: "What's the issue?", noteRequired: true, goodAnswers: ['Yes'] },
   { id: 'officeAction', label: 'Is there anything the office needs to action before tomorrow?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: 'What do they need to do?', noteRequired: true, goodAnswers: ['No'] },
   { id: 'materialsToOrder', label: 'Are there any materials that need to be ordered?', options: ['Yes','No'], noteWhen: ['Yes'], notePrompt: "What's needed?", noteRequired: true, goodAnswers: ['No'] },
@@ -683,14 +654,14 @@ const KPI_DESCRIPTIONS = {
     excellent: [
       'Makes informed decisions within their authority.',
       'Solves problems before contacting the office.',
-      'Tradify updated with progress photos and notes.',
+      'TRADIEXAI updated with progress photos and notes.',
       'Variations and site issues recorded promptly.',
       'Professional communication with clients, suppliers and subcontractors.',
       'Escalates issues early with recommended solutions.'
     ],
     poor: [
       'Constant reliance on the office.',
-      'Tradify not maintained.',
+      'TRADIEXAI not maintained.',
       'Poor communication with clients or trades.',
       'Variations not documented.',
       'Problems communicated too late.',
@@ -702,7 +673,7 @@ const KPI_DESCRIPTIONS = {
     excellent: [
       'All paperwork uploaded to Hubdoc every Friday.',
       'Timesheets submitted on time.',
-      'Tradify maintained throughout the project.',
+      'TRADIEXAI maintained throughout the project.',
       'Materials organised ahead of schedule.',
       'Site presented professionally.',
       'Represents Kings Construction with pride.'
@@ -710,7 +681,7 @@ const KPI_DESCRIPTIONS = {
     poor: [
       'Missing or late paperwork.',
       'Late timesheets.',
-      'Tradify incomplete or not updated.',
+      'TRADIEXAI incomplete or not updated.',
       'Materials not organised.',
       'Untidy worksite.',
       'Poor representation of the company.'
@@ -984,7 +955,9 @@ function buildDailyChecklist() {
       <div class="gear-item${q.important ? ' important' : ''}" id="daily-${q.id}">
         <label>${q.label}</label>
         <div class="yesno" data-field="${q.id}">${buttons}</div>
-        <div class="note-box"><textarea placeholder="${q.notePrompt || ''}${q.noteRequired ? ' (required)' : ' (optional)'}" id="note-${q.id}"></textarea></div>
+        <div class="note-box"><textarea placeholder="${q.notePrompt || ''}${q.noteRequired ? ' (required)' : ' (optional)'}" id="note-${q.id}"></textarea>${(q.extraFields || []).map(f => `
+          <label style="margin-top:10px">${f.label} <span class="required-star">*</span></label>
+          <input type="${f.type || 'text'}" ${f.type === 'number' ? 'min="1" step="1" inputmode="numeric"' : ''} id="extra-${f.id}" placeholder="${f.placeholder || ''}">`).join('')}</div>
         ${q.celebrateEmoji ? `<div class="smiley-box" id="smiley-${q.id}">${q.celebrateEmoji}</div>` : ''}
       </div>`;
   }).join('');
@@ -1028,7 +1001,7 @@ function toggleFlag(name) {
 }
 
 /* ============================================================
-   DAILY CHECKLIST (Tradify / office questions)
+   DAILY CHECKLIST (TRADIEXAI / office questions)
    ============================================================ */
 function setDaily(id, value) {
   dailyState[id] = value;
@@ -1055,12 +1028,17 @@ async function submitEod() {
   const job = document.getElementById('jobSelect').value;
   if (!job) return alert('Please select a job.');
   const jobUpdate = document.getElementById('jobUpdate').value.trim();
-  if (!jobUpdate) return alert('Job update is required — where the job is at, what\'s left, any blockers.');
+  if (!jobUpdate) return alert('Job update is required — where the job is at and what\'s left.');
 
   for (const q of DAILY_CHECKLIST) {
     if (!dailyState[q.id]) return alert('Please answer: ' + q.label);
     if (q.noteRequired && q.noteWhen.includes(dailyState[q.id]) && !document.getElementById('note-' + q.id).value.trim()) {
       return alert('Please add a note for: ' + q.label);
+    }
+    if (q.extraFields && q.noteWhen.includes(dailyState[q.id])) {
+      for (const f of q.extraFields) {
+        if (!document.getElementById('extra-' + f.id).value.trim()) return alert('Please answer: ' + f.label);
+      }
     }
   }
 
@@ -1077,15 +1055,15 @@ async function submitEod() {
     role: [...new Set(selectedNames.map(p => p.role))].join(', '),
     job: job,
     jobUpdate: jobUpdate,
-    flagDamage: document.getElementById('chkDamage').checked,
-    flagDamageDetail: document.getElementById('detailDamageText').value.trim(),
-    flagVariation: document.getElementById('chkVariation').checked,
-    flagVariationDetail: document.getElementById('detailVariationText').value.trim(),
-    variationHours: document.getElementById('variationHours').value,
-    flagHoldUp: document.getElementById('chkHoldUp').checked,
-    flagHoldUpDetail: document.getElementById('detailHoldUpText').value.trim(),
-    flagMaterials: document.getElementById('chkMaterials').checked,
-    flagMaterialsDetail: document.getElementById('detailMaterialsText').value.trim(),
+    flagDamage: false,
+    flagDamageDetail: '',
+    flagVariation: false,
+    flagVariationDetail: '',
+    variationHours: '',
+    flagHoldUp: false,
+    flagHoldUpDetail: '',
+    flagMaterials: false,
+    flagMaterialsDetail: '',
     siteClean: dailyPayload.siteClean,
     siteCleanNote: dailyPayload.siteCleanNote,
     toolsPacked: dailyPayload.toolsPacked,
@@ -1098,7 +1076,9 @@ async function submitEod() {
     apprenticeReflection: selectedNames.some(p => p.role === 'Apprentice') ? document.getElementById('apprenticeReflection').value.trim() : '',
 
     tasksCompleted: dailyPayload.tasksCompleted,
-    tasksOutstanding: dailyPayload.tasksCompletedNote,
+    tasksOutstanding: dailyPayload.tasksCompleted === 'No'
+      ? `${dailyPayload.tasksCompletedNote} — Time needed: ${document.getElementById('extra-tasksTimeNeeded').value.trim()} — Guys needed: ${document.getElementById('extra-tasksCrewNeeded').value.trim()}`
+      : dailyPayload.tasksCompletedNote,
     scheduleImpact: dailyPayload.scheduleImpact,
     scheduleImpactDetail: dailyPayload.scheduleImpactNote,
     photosTaken: dailyPayload.photosTaken,
@@ -1147,15 +1127,8 @@ function resetForm() {
   document.querySelectorAll('#nameGrid .pill').forEach(b => b.classList.remove('selected'));
   document.getElementById('jobSelect').value = '';
   document.getElementById('jobUpdate').value = '';
-  ['Damage','Variation','HoldUp','Materials'].forEach(f => {
-    document.getElementById('chk' + f).checked = false;
-    toggleFlag(f);
-    const t = document.getElementById('detail' + f + 'Text');
-    if (t) t.value = '';
-  });
-  document.getElementById('variationHours').value = '';
   document.querySelectorAll('.yesno button').forEach(b => b.classList.remove('selected'));
-  document.querySelectorAll('.note-box').forEach(n => { n.classList.remove('show'); n.querySelector('textarea').value = ''; });
+  document.querySelectorAll('.note-box').forEach(n => { n.classList.remove('show'); n.querySelectorAll('textarea, input').forEach(el => el.value = ''); });
   document.querySelectorAll('.smiley-box').forEach(s => s.classList.remove('show'));
   document.getElementById('otherNotes').value = '';
   document.getElementById('apprenticeReflection').value = '';
