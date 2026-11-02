@@ -307,6 +307,13 @@
   #jsaCanvas { display: block; width: 100%; height: 160px; touch-action: none; }
   .sig-actions { display: flex; gap: 8px; margin-top: 10px; }
   .sig-actions button { flex: 1; }
+  .proof-card { border: 2px solid var(--accent); }
+  .proof-btn { width: 100%; padding: 16px; font-size: 16px; font-weight: 700; border-radius: 10px;
+    border: 2px dashed var(--accent-dark); background: #fffaf0; color: #333; cursor: pointer; }
+  .proof-preview { display: block; width: 100%; margin-top: 10px; border-radius: 8px; border: 1px solid #ddd; }
+  .proof-info { font-size: 13px; margin-top: 6px; }
+  .proof-info.warn { color: var(--danger); font-weight: 600; }
+  .proof-info.good { color: var(--ok); font-weight: 600; }
 
   /* QC completion checklist */
   .qc-trade-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -398,8 +405,6 @@
 <nav class="tabs">
   <button id="tabBtnMorning" onclick="showTab('morning')">JOB START</button>
   <button id="tabBtnCrew" class="active" onclick="showTab('crew')">JOB END</button>
-  <button id="tabBtnSup" onclick="showTab('sup')">SUPERVISOR</button>
-  <button id="tabBtnQC" onclick="showTab('qc')">QC / COMPLETION</button>
 </nav>
 
 <main>
@@ -439,6 +444,15 @@
         <button class="btn-secondary" type="button" onclick="clearJsaCanvas()">Clear</button>
         <button class="btn-primary" type="button" onclick="saveJsaSignature()">Save signature</button>
       </div>
+    </div>
+
+    <div class="card proof-card">
+      <h2>Site photo — starting work <span class="required-star">*</span></h2>
+      <div class="card-sub">Take a photo of the site right now. It gets stamped with the time and your GPS location.</div>
+      <button class="proof-btn" type="button" onclick="takeProofPhoto('jsa')">📷 Take photo now</button>
+      <input type="file" accept="image/*" capture="environment" id="proofInput-jsa" class="hidden" onchange="handleProofPhoto('jsa', this)">
+      <img id="proofImg-jsa" class="proof-preview hidden" alt="">
+      <div class="proof-info" id="proofInfo-jsa"></div>
     </div>
 
     <button class="btn-primary" id="jsaSubmitBtn" onclick="submitJsaSignon()">Submit morning JSA sign-on</button>
@@ -513,145 +527,6 @@
     </div>
 
     <button class="btn-primary" id="submitBtn" onclick="submitEod()">Submit end-of-day</button>
-  </div>
-
-  <!-- ============ SUPERVISOR TAB ============ -->
-  <div id="tab-sup" class="hidden">
-    <div id="pinScreen" class="card pin-pad">
-      <h2>Supervisor PIN</h2>
-      <div class="pin-dots" id="pinDots"></div>
-      <div class="pin-grid">
-        <button onclick="pinPress('1')">1</button><button onclick="pinPress('2')">2</button><button onclick="pinPress('3')">3</button>
-        <button onclick="pinPress('4')">4</button><button onclick="pinPress('5')">5</button><button onclick="pinPress('6')">6</button>
-        <button onclick="pinPress('7')">7</button><button onclick="pinPress('8')">8</button><button onclick="pinPress('9')">9</button>
-        <button onclick="pinClear()">Clear</button><button onclick="pinPress('0')">0</button><button onclick="pinBackspace()">⌫</button>
-      </div>
-    </div>
-
-    <div id="supDashboard" class="hidden">
-      <div class="card">
-        <h2>Today — <span id="dashDate"></span></h2>
-        <div class="summary-row"><span>Submitted</span><span id="dashSubmittedCount">—</span></div>
-        <div class="summary-row"><span>Outstanding</span><span id="dashOutstanding">—</span></div>
-        <div class="summary-row"><span>Total variation hours</span><span id="dashVarHours">—</span></div>
-        <button class="btn-secondary" onclick="loadSupervisorSummary()">Refresh</button>
-      </div>
-      <div class="card">
-        <h2>Flags raised today</h2>
-        <div id="dashFlags"><p class="helper">Loading…</p></div>
-      </div>
-
-      <div class="card" id="weeklyKpiSection">
-        <h2>Weekly Crew Leader KPI Scorecard</h2>
-        <div class="card-sub">Supervisors only — complete once per week</div><div class="helper" style="color: var(--danger); font-weight: 600;">Must be completed before 7:00 PM or it won't be applicable for that week.</div>
-
-        <label>Crew leader</label>
-        <select id="kpiCrewLeader"><option value="">Select…</option></select>
-
-        <label>Week of</label>
-        <div class="week-row">
-          <input type="date" id="kpiWeekStart">
-          <span>to</span>
-          <input type="date" id="kpiWeekEnd">
-        </div>
-
-        <div id="weeklyKpiList"></div>
-
-        <div class="kpi-total-box" id="kpiTotalBox">Total score: 0 / 45</div>
-
-        <label>Are everyone's hours done and correct to the best of your ability?</label>
-        <div class="yesno" data-field="hoursCorrect">
-          <button class="sel-yes" onclick="setWeeklyCheck('hoursCorrect','Yes')">Yes</button>
-          <button class="sel-no" onclick="setWeeklyCheck('hoursCorrect','No')">No</button>
-        </div>
-
-        <label>Are all receipts uploaded correctly with the job number (JN)?</label>
-        <div class="yesno" data-field="receiptsUploaded">
-          <button class="sel-yes" onclick="setWeeklyCheck('receiptsUploaded','Yes')">Yes</button>
-          <button class="sel-no" onclick="setWeeklyCheck('receiptsUploaded','No')">No</button>
-        </div>
-
-        <label>Biggest win this week</label>
-        <textarea id="kpiBiggestWin"></textarea>
-        <label>Biggest challenge this week</label>
-        <textarea id="kpiBiggestChallenge"></textarea>
-        <label>Areas for improvement</label>
-        <textarea id="kpiAreasImprovement"></textarea>
-        <label>Goals for next week</label>
-        <textarea id="kpiGoalsNextWeek"></textarea>
-        <label>How can the office better support you?</label>
-        <textarea id="kpiOfficeSupport"></textarea>
-
-        <button class="btn-primary" onclick="submitWeeklyKpi()">Submit weekly KPI</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============ QC TAB ============ -->
-  <div id="tab-qc" class="hidden">
-
-    <div class="card">
-      <h2>QC/COMPLETION</h2>
-      <label>JOB</label>
-      <select id="qcJobSelect" onchange="onQcJobChange()"><option value="">Loading jobs…</option></select>
-      <div class="helper" id="qcJobAddress"></div>
-
-      <label>COMPLETED BY</label>
-      <div id="qcSupervisorGrid" class="name-grid"></div>
-
-      <div class="helper" style="margin-top: 12px;">Date: <span id="qcDate"></span></div>
-    </div>
-
-    <div class="card qc-summary-box hidden" id="qcSummaryBox">
-      <h2>Outstanding defects</h2>
-      <div id="qcSummaryList"></div>
-    </div>
-
-    <div id="qcTradesList"></div>
-
-    <div class="card">
-      <h2>COMPLETION</h2>
-
-      <label>IS THE CLIENT HAPPY?</label>
-      <div class="yesno qc-yesno" data-completion="clientHappy">
-        <button class="sel-yes" data-opt="Yes" onclick="setQcCompletion('clientHappy','Yes')">YES</button>
-        <button class="sel-no" data-opt="No" onclick="setQcCompletion('clientHappy','No')">NO</button>
-        <button class="sel-yes" data-opt="N/A" onclick="setQcCompletion('clientHappy','N/A')">N/A</button>
-      </div>
-      <div class="qc-defect-box" id="qc-completion-reason-box-clientHappy">
-        <label>WHY NOT? <span class="required-star">*</span></label>
-        <textarea id="qc-completion-reason-clientHappy" placeholder="What's the issue?"></textarea>
-      </div>
-
-      <label>HAS EVERYTHING BEEN REMOVED FROM THE JOB SITE?</label>
-      <div class="yesno qc-yesno" data-completion="siteCleared">
-        <button class="sel-yes" data-opt="Yes" onclick="setQcCompletion('siteCleared','Yes')">YES</button>
-        <button class="sel-no" data-opt="No" onclick="setQcCompletion('siteCleared','No')">NO</button>
-        <button class="sel-yes" data-opt="N/A" onclick="setQcCompletion('siteCleared','N/A')">N/A</button>
-      </div>
-      <div class="qc-defect-box" id="qc-completion-reason-box-siteCleared">
-        <label>WHY NOT? <span class="required-star">*</span></label>
-        <textarea id="qc-completion-reason-siteCleared" placeholder="What's still on site?"></textarea>
-      </div>
-
-      <label>IS THE JOB SITE CLEAN?</label>
-      <div class="yesno qc-yesno" data-completion="siteClean">
-        <button class="sel-yes" data-opt="Yes" onclick="setQcCompletion('siteClean','Yes')">YES</button>
-        <button class="sel-no" data-opt="No" onclick="setQcCompletion('siteClean','No')">NO</button>
-        <button class="sel-yes" data-opt="N/A" onclick="setQcCompletion('siteClean','N/A')">N/A</button>
-      </div>
-      <div class="qc-defect-box" id="qc-completion-reason-box-siteClean">
-        <label>WHY NOT? <span class="required-star">*</span></label>
-        <textarea id="qc-completion-reason-siteClean" placeholder="What needs cleaning?"></textarea>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>NOTES</h2>
-      <textarea id="qcNotes" class="qc-notes" placeholder="Final comments, outstanding defects, client requests, or anything else about completion..."></textarea>
-    </div>
-
-    <button class="btn-primary" id="qcSubmitBtn" onclick="submitQc()">QC COMPLETE</button>
   </div>
 
 </main>
@@ -1025,6 +900,11 @@ WEEKLY_KPI.forEach(k => kpiState[k.id] = null);
 let weeklyCheckState = { hoursCorrect: null, receiptsUploaded: null };
 let pinBuffer = "";
 let jsaState = { currentWorker: null, signed: {} };
+// Site photo (JSA): reject a photo older than this many minutes — stops
+// someone picking an old photo from their gallery.
+const PROOF_MAX_AGE_MIN = 10;
+let proofState = { jsa: null };
+let proofLocation = { jsa: null };
 let jsaDrawing = false;
 let jsaLastPoint = null;
 let jsaHasSignature = false;
@@ -1039,15 +919,9 @@ QC_COMPLETION_QUESTIONS.forEach(q => { qcState.completion[q.id] = { status: null
 function init() {
   buildNameGrid();
   buildDailyChecklist();
-  buildWeeklyKpiCrewSelect();
-  buildWeeklyKpi();
-  setWeekDefaults();
   buildJsaCrewGrid();
   buildJsaSteps();
   initJsaCanvas();
-  buildQcTrades();
-  buildQcSupervisorGrid();
-  setQcDate();
   loadJobs();
   document.getElementById('apprenticeCard').classList.add('hidden');
 
@@ -1055,7 +929,7 @@ function init() {
   // (e.g. from an SMS reminder link) jumps straight to that tab.
   // '#punch' is kept as an alias so any old bookmarked links still work.
   const hashTab = window.location.hash.replace('#', '');
-  const tabAliases = { morning: 'morning', crew: 'crew', sup: 'sup', qc: 'qc', punch: 'qc' };
+  const tabAliases = { morning: 'morning', crew: 'crew' };
   if (tabAliases[hashTab]) {
     showTab(tabAliases[hashTab]);
   }
@@ -1127,7 +1001,6 @@ async function loadJobs() {
     const opts = '<option value="">Select job…</option>' + jobs.map(j => `<option value="${j}">${j}</option>`).join('');
     document.getElementById('jobSelect').innerHTML = opts;
     document.getElementById('jsaJobSelect').innerHTML = opts;
-    document.getElementById('qcJobSelect').innerHTML = opts;
   } catch (e) {
     document.getElementById('jobSelect').innerHTML = '<option value="">Could not load jobs — check connection</option>';
   }
@@ -1139,13 +1012,8 @@ async function loadJobs() {
 function showTab(tab) {
   document.getElementById('tab-morning').classList.toggle('hidden', tab !== 'morning');
   document.getElementById('tab-crew').classList.toggle('hidden', tab !== 'crew');
-  document.getElementById('tab-sup').classList.toggle('hidden', tab !== 'sup');
-  document.getElementById('tab-qc').classList.toggle('hidden', tab !== 'qc');
   document.getElementById('tabBtnMorning').classList.toggle('active', tab === 'morning');
   document.getElementById('tabBtnCrew').classList.toggle('active', tab === 'crew');
-  document.getElementById('tabBtnSup').classList.toggle('active', tab === 'sup');
-  document.getElementById('tabBtnQC').classList.toggle('active', tab === 'qc');
-  if (tab === 'qc') setQcDate();
 }
 
 /* ============================================================
@@ -1920,11 +1788,13 @@ async function submitJsaSignon() {
   if (!job) return alert('Select a job.');
   const workers = Object.keys(jsaState.signed);
   if (!workers.length) return alert('At least one crew member needs to sign the JSA.');
+  if (!proofState.jsa) return alert('Please take a site photo before signing on (Site photo — starting work).');
 
   const payload = {
     action: 'jsa_signon',
     job,
-    workers: workers.map(name => ({ name, role: jsaState.signed[name].role, signature: jsaState.signed[name].dataUrl }))
+    workers: workers.map(name => ({ name, role: jsaState.signed[name].role, signature: jsaState.signed[name].dataUrl })),
+    proof: proofState.jsa
   };
 
   const btn = document.getElementById('jsaSubmitBtn');
@@ -1954,7 +1824,174 @@ function resetJsaForm() {
   document.getElementById('jsaSignPad').classList.add('hidden');
   document.getElementById('jsaJobSelect').value = '';
   clearJsaCanvas();
+  resetProof('jsa');
   window.scrollTo(0, 0);
+}
+
+/* ============================================================
+   SITE PHOTO PROOF (JSA)
+   Photo is taken live with the camera, checked for age, then the
+   date/time + GPS location + job are burned into the image itself.
+   ============================================================ */
+function getLocation_() {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) return resolve({ error: 'Location not supported on this phone' });
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: Math.round(p.coords.accuracy) }),
+      err => resolve({ error: err.code === 1 ? 'Location permission denied' : 'Could not get GPS location' }),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }
+    );
+  });
+}
+
+function takeProofPhoto(key) {
+  // Start getting GPS straight away (while the camera is open)
+  proofLocation[key] = getLocation_();
+  document.getElementById('proofInput-' + key).click();
+}
+
+// Reads the camera's "date taken" (EXIF DateTimeOriginal) from a JPEG, if present.
+function readExifDate_(buf) {
+  try {
+    const v = new DataView(buf);
+    if (v.getUint16(0) !== 0xFFD8) return null;
+    let off = 2;
+    while (off < v.byteLength - 4) {
+      const marker = v.getUint16(off);
+      const size = v.getUint16(off + 2);
+      if (marker === 0xFFE1 && v.getUint32(off + 4) === 0x45786966) {
+        const tiff = off + 10;
+        const little = v.getUint16(tiff) === 0x4949;
+        const u16 = o => v.getUint16(o, little), u32 = o => v.getUint32(o, little);
+        const findTag = (ifd, tag) => {
+          const n = u16(ifd);
+          for (let i = 0; i < n; i++) {
+            const e = ifd + 2 + i * 12;
+            if (u16(e) === tag) return e;
+          }
+          return null;
+        };
+        const ifd0 = tiff + u32(tiff + 4);
+        const exifPtr = findTag(ifd0, 0x8769);
+        if (!exifPtr) return null;
+        const exifIfd = tiff + u32(exifPtr + 8);
+        const dt = findTag(exifIfd, 0x9003) || findTag(exifIfd, 0x9004);
+        if (!dt) return null;
+        const strOff = tiff + u32(dt + 8);
+        let s = '';
+        for (let i = 0; i < 19; i++) s += String.fromCharCode(v.getUint8(strOff + i));
+        const m = s.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+        if (!m) return null;
+        return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+      }
+      if ((marker & 0xFF00) !== 0xFF00) break;
+      off += 2 + size;
+    }
+  } catch (e) { /* no usable EXIF */ }
+  return null;
+}
+
+function loadImage_(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { resolve(img); setTimeout(() => URL.revokeObjectURL(url), 1000); };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+async function handleProofPhoto(key, inputEl) {
+  const file = inputEl.files && inputEl.files[0];
+  inputEl.value = '';
+  if (!file) return;
+  const info = document.getElementById('proofInfo-' + key);
+  info.className = 'proof-info';
+  info.textContent = 'Stamping photo with time and location…';
+
+  const now = new Date();
+  let exifDate = null;
+  try { exifDate = readExifDate_(await file.slice(0, 131072).arrayBuffer()); } catch (e) {}
+  const takenAt = exifDate || (file.lastModified ? new Date(file.lastModified) : now);
+  const ageMin = (now - takenAt) / 60000;
+  if (ageMin > PROOF_MAX_AGE_MIN) {
+    proofState[key] = null;
+    document.getElementById('proofImg-' + key).classList.add('hidden');
+    info.className = 'proof-info warn';
+    info.textContent = `That photo was taken ${Math.round(ageMin)} minutes ago. Please take a NEW photo now with the camera.`;
+    return;
+  }
+
+  const loc = await (proofLocation[key] || getLocation_());
+  let img;
+  try { img = await loadImage_(file); } catch (e) {
+    info.className = 'proof-info warn';
+    info.textContent = 'Could not read that photo — please try again.';
+    return;
+  }
+
+  const maxDim = 1600;
+  let w = img.naturalWidth, h = img.naturalHeight;
+  if (w > maxDim || h > maxDim) {
+    if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; } else { w = Math.round(w * maxDim / h); h = maxDim; }
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, w, h);
+
+  const stampTime = now.toLocaleString('en-AU', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  const job = document.getElementById('jsaJobSelect').value;
+  const lines = [
+    `KINGS CONSTRUCTION · JOB START${job ? ' · ' + job : ''}`,
+    stampTime,
+    loc.error ? `NO GPS — ${loc.error}` : `GPS ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)} (±${loc.accuracy} m)`
+  ];
+  const fs = Math.max(16, Math.round(w / 38));
+  const pad = Math.round(fs * 0.6);
+  const barH = lines.length * fs * 1.3 + pad * 2;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, h - barH, w, barH);
+  ctx.font = `bold ${fs}px sans-serif`;
+  ctx.textBaseline = 'top';
+  lines.forEach((t, i) => {
+    ctx.fillStyle = (i === 2 && loc.error) ? '#ff6b6b' : '#ffffff';
+    ctx.fillText(t, pad, h - barH + pad + i * fs * 1.3, w - pad * 2);
+  });
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+  proofState[key] = {
+    photo: dataUrl,
+    takenAt: takenAt.toISOString(),
+    stampedAt: now.toISOString(),
+    exifTime: exifDate ? exifDate.toISOString() : '',
+    lat: loc.lat == null ? '' : loc.lat,
+    lng: loc.lng == null ? '' : loc.lng,
+    accuracy: loc.accuracy == null ? '' : loc.accuracy,
+    locationError: loc.error || ''
+  };
+  const prev = document.getElementById('proofImg-' + key);
+  prev.src = dataUrl;
+  prev.classList.remove('hidden');
+  if (loc.error) {
+    info.className = 'proof-info warn';
+    info.textContent = `Photo saved, but no GPS (${loc.error}). Turn on Location for your browser and retake if you can — the office will see there was no location.`;
+  } else {
+    info.className = 'proof-info good';
+    info.textContent = `✔ Photo stamped ${stampTime} with GPS location. Tap the button again to retake.`;
+  }
+}
+
+function resetProof(key) {
+  proofState[key] = null;
+  proofLocation[key] = null;
+  const img = document.getElementById('proofImg-' + key);
+  img.src = '';
+  img.classList.add('hidden');
+  const info = document.getElementById('proofInfo-' + key);
+  info.className = 'proof-info';
+  info.textContent = '';
 }
 
 init();
